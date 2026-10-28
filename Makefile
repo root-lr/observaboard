@@ -12,6 +12,9 @@ CADDY_IMG := caddy:2.11
 LOKI_IMG  := grafana/loki:3.7.9
 ALLOY_IMG := grafana/alloy:v1.21.2
 
+# The generated central directory is private (0700): run the checks as the current user.
+AS_ME := --user "$$(id -u):$$(id -g)"
+
 .PHONY: build test vet render test-rules test-configs e2e dist clean
 
 build:
@@ -35,12 +38,12 @@ render: build
 # Alert rule unit tests (local promtool, otherwise via Docker).
 test-rules: render
 	@if command -v promtool >/dev/null; then promtool test rules tests/rules/observa.test.yml; \
-	else docker run --rm -v "$(CURDIR)":/w -w /w --entrypoint promtool $(PROM_IMG) test rules tests/rules/observa.test.yml; fi
+	else docker run --rm $(AS_ME) -v "$(CURDIR)":/w -w /w --entrypoint promtool $(PROM_IMG) test rules tests/rules/observa.test.yml; fi
 
 # Validates each generated configuration with the component's official binary.
 test-configs: render
-	docker run --rm -v "$(CURDIR)/build/central":/c -w /c --entrypoint promtool $(PROM_IMG) check rules prometheus/rules/observa.yml
-	docker run --rm -v "$(CURDIR)/build/central":/c --entrypoint amtool $(AM_IMG) check-config /c/alertmanager/alertmanager.yml
+	docker run --rm $(AS_ME) -v "$(CURDIR)/build/central":/c -w /c --entrypoint promtool $(PROM_IMG) check rules prometheus/rules/observa.yml
+	docker run --rm $(AS_ME) -v "$(CURDIR)/build/central":/c --entrypoint amtool $(AM_IMG) check-config /c/alertmanager/alertmanager.yml
 	docker run --rm -v "$(CURDIR)/build/central/caddy":/etc/caddy $(CADDY_IMG) caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
 	docker run --rm -v "$(CURDIR)/build/central/loki":/etc/loki $(LOKI_IMG) -config.file=/etc/loki/loki.yaml -verify-config
 	docker run --rm -v "$(CURDIR)/build/agent/config":/a $(ALLOY_IMG) fmt /a/config.alloy > /dev/null

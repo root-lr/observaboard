@@ -1,0 +1,89 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" width="960" height="520" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif">
+  <title>ObservaBoard architecture: agents on each server push metrics, logs and traces over HTTPS to the central</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="520" rx="16" fill="#f8fafc"/>
+
+  <!-- Central -->
+  <rect x="40" y="28" width="880" height="212" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+  <text x="60" y="58" font-size="16" font-weight="700" fill="#0f172a">Central server</text>
+  <text x="194" y="58" font-size="13" fill="#64748b">observa central install --domain …</text>
+
+  <rect x="60" y="80" width="140" height="64" rx="8" fill="#ecfdf5" stroke="#10b981"/>
+  <text x="130" y="106" font-size="14" font-weight="600" fill="#065f46" text-anchor="middle">Caddy</text>
+  <text x="130" y="126" font-size="12" fill="#047857" text-anchor="middle">HTTPS · tokens</text>
+
+  <rect x="250" y="80" width="140" height="44" rx="8" fill="#fff7ed" stroke="#f97316"/>
+  <text x="320" y="107" font-size="14" font-weight="600" fill="#9a3412" text-anchor="middle">Prometheus</text>
+  <rect x="250" y="132" width="140" height="44" rx="8" fill="#eff6ff" stroke="#3b82f6"/>
+  <text x="320" y="159" font-size="14" font-weight="600" fill="#1e40af" text-anchor="middle">Loki</text>
+  <rect x="250" y="184" width="140" height="44" rx="8" fill="#f5f3ff" stroke="#8b5cf6"/>
+  <text x="320" y="211" font-size="14" font-weight="600" fill="#5b21b6" text-anchor="middle">Tempo</text>
+
+  <rect x="450" y="80" width="230" height="64" rx="8" fill="#fef2f2" stroke="#ef4444"/>
+  <text x="565" y="106" font-size="14" font-weight="600" fill="#991b1b" text-anchor="middle">Alertmanager</text>
+  <text x="565" y="126" font-size="12" fill="#b91c1c" text-anchor="middle">email · Slack · Telegram · webhook</text>
+
+  <rect x="450" y="160" width="230" height="64" rx="8" fill="#fffbeb" stroke="#f59e0b"/>
+  <text x="565" y="186" font-size="14" font-weight="600" fill="#92400e" text-anchor="middle">Grafana</text>
+  <text x="565" y="206" font-size="12" fill="#b45309" text-anchor="middle">7 dashboards · runbooks</text>
+
+  <rect x="720" y="80" width="180" height="144" rx="8" fill="#f1f5f9" stroke="#94a3b8" stroke-dasharray="4 3"/>
+  <text x="810" y="108" font-size="13" font-weight="600" fill="#334155" text-anchor="middle">Generated for you</text>
+  <text x="810" y="134" font-size="12" fill="#475569" text-anchor="middle">14 alert rules</text>
+  <text x="810" y="154" font-size="12" fill="#475569" text-anchor="middle">thresholds per project</text>
+  <text x="810" y="174" font-size="12" fill="#475569" text-anchor="middle">routing per severity</text>
+  <text x="810" y="194" font-size="12" fill="#475569" text-anchor="middle">data sources · retention</text>
+
+  <path d="M200 112 H244" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <path d="M222 112 V154 H244" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <path d="M222 154 V206 H244" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <path d="M390 102 H444" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <path d="M390 154 H420 V206" stroke="#64748b" stroke-width="1.5" fill="none"/>
+  <path d="M420 192 H444" stroke="#64748b" stroke-width="1.5" fill="none" marker-end="url(#arrow)"/>
+  <path d="M390 206 H420" stroke="#64748b" stroke-width="1.5" fill="none"/>
+
+  <!-- Push: every agent joins one line that goes up to Caddy -->
+  <path d="M175 320 V280 M480 320 V280 M785 320 V280 M785 280 H130" stroke="#10b981" stroke-width="2" fill="none"/>
+  <path d="M130 280 V150" stroke="#10b981" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <rect x="250" y="256" width="340" height="26" rx="13" fill="#ecfdf5" stroke="#10b981"/>
+  <text x="420" y="274" font-size="12" font-weight="600" fill="#047857" text-anchor="middle">HTTPS push · one token per agent · no inbound port</text>
+
+  <!-- Servers -->
+  <g>
+    <rect x="40" y="320" width="270" height="168" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="60" y="348" font-size="15" font-weight="700" fill="#0f172a">Server A</text>
+    <rect x="60" y="362" width="230" height="40" rx="8" fill="#ecfeff" stroke="#06b6d4"/>
+    <text x="175" y="387" font-size="13" font-weight="600" fill="#155e75" text-anchor="middle">agent (Grafana Alloy)</text>
+    <rect x="60" y="414" width="110" height="56" rx="8" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="115" y="438" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">project 1</text>
+    <text x="115" y="456" font-size="11" fill="#64748b" text-anchor="middle">Django · Celery</text>
+    <rect x="180" y="414" width="110" height="56" rx="8" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="235" y="438" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">databases</text>
+    <text x="235" y="456" font-size="11" fill="#64748b" text-anchor="middle">Postgres · Redis</text>
+  </g>
+  <g>
+    <rect x="345" y="320" width="270" height="168" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="365" y="348" font-size="15" font-weight="700" fill="#0f172a">Server B</text>
+    <rect x="365" y="362" width="230" height="40" rx="8" fill="#ecfeff" stroke="#06b6d4"/>
+    <text x="480" y="387" font-size="13" font-weight="600" fill="#155e75" text-anchor="middle">agent (Grafana Alloy)</text>
+    <rect x="365" y="414" width="230" height="56" rx="8" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="480" y="438" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">project 2</text>
+    <text x="480" y="456" font-size="11" fill="#64748b" text-anchor="middle">FastAPI · Node.js · any container</text>
+  </g>
+  <g>
+    <rect x="650" y="320" width="270" height="168" rx="12" fill="#ffffff" stroke="#cbd5e1"/>
+    <text x="670" y="348" font-size="15" font-weight="700" fill="#0f172a">Server C</text>
+    <rect x="670" y="362" width="230" height="40" rx="8" fill="#ecfeff" stroke="#06b6d4"/>
+    <text x="785" y="387" font-size="13" font-weight="600" fill="#155e75" text-anchor="middle">agent (Grafana Alloy)</text>
+    <rect x="670" y="414" width="230" height="56" rx="8" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="785" y="438" font-size="12" font-weight="600" fill="#334155" text-anchor="middle">project 1 · staging</text>
+    <text x="785" y="456" font-size="11" fill="#64748b" text-anchor="middle">host · containers · logs · traces</text>
+  </g>
+
+  <text x="480" y="508" font-size="12" fill="#64748b" text-anchor="middle">Each agent collects host and container metrics, logs, OpenTelemetry traces and database metrics</text>
+</svg>

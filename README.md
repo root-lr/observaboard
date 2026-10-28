@@ -1,5 +1,10 @@
 # ObservaBoard
 
+[![CI](https://github.com/root-lr/observaboard/actions/workflows/ci.yml/badge.svg)](https://github.com/root-lr/observaboard/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/root-lr/observaboard)](https://github.com/root-lr/observaboard/releases)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Go](https://img.shields.io/badge/go-1.24+-00ADD8.svg)](go.mod)
+
 **Monitoring for your Docker applications in one command.** ObservaBoard installs and configures Grafana, Prometheus, Loki, Tempo and Alertmanager, detects each project's stack (Django, FastAPI, Celery, PostgreSQL, Redis…), instruments it without touching the code, and generates matching dashboards, alerts and runbooks.
 
 ```text
@@ -14,7 +19,16 @@ Self-hosted, Docker-native (Compose or `docker run`), multi-project and multi-se
 
 ## Try it in 5 minutes (Mac, Windows or Linux)
 
-Requirements: Docker (Docker Desktop on Mac/Windows) and Go 1.24+ to build the CLI.
+Requirements: Docker (Docker Desktop on Mac/Windows).
+
+Install the CLI from the [releases](https://github.com/root-lr/observaboard/releases) (Linux and macOS, amd64 and arm64; checksums verified):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/root-lr/observaboard/main/install.sh | sh
+observa up --all-in-one --with-example
+```
+
+Or build it from source (Go 1.24+):
 
 ```bash
 git clone https://github.com/root-lr/observaboard && cd observaboard
@@ -35,24 +49,13 @@ docker compose --project-directory ~/.observa/local/example exec web python mana
 #   other failures: latency · dependency · tasks · status · reset
 ```
 
-To stop: `bin/observa down --all-in-one` (add `--volumes` to delete the data).
+To stop: `observa down --all-in-one` (add `--volumes` to delete the data).
 
 ---
 
 ## Deploying for real
 
-```text
-              ┌──────────────── Central server (small dedicated VPS) ─────────────┐
-              │ Caddy (HTTPS, tokens) → Prometheus · Loki · Tempo → Grafana        │
-              │                         Prometheus → Alertmanager → email, Slack…  │
-              └───────────────▲───────────────────▲───────────────────▲───────────┘
-                              │    HTTPS push + one token per agent    │
-                   ┌──────────┴─────────┐ ┌───────┴────────────┐ ┌────┴───────────────┐
-                   │ Server A           │ │ Server B           │ │ Server C           │
-                   │ agent (Alloy)      │ │ agent (Alloy)      │ │ agent (Alloy)      │
-                   │ project1 · api/db  │ │ project2 · api     │ │ project1 · staging │
-                   └────────────────────┘ └────────────────────┘ └────────────────────┘
-```
+![ObservaBoard architecture: an agent on each server pushes metrics, logs and traces over HTTPS to the central, which stores them and runs Grafana and Alertmanager](docs/images/architecture.svg)
 
 ### 1. The central
 
@@ -188,4 +191,15 @@ Global `--dry-run` option: prints the Docker commands instead of running them.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Dependencies vendored in `internal/thirdparty/` keep their original license (MIT/Apache-2.0, BSD-3-Clause).
+ObservaBoard is released under the [MIT license](LICENSE).
+
+The components it deploys keep their own licenses. They are pulled unmodified from their official images, and ObservaBoard does not redistribute them:
+
+| Component | License |
+| --- | --- |
+| Grafana, Loki, Tempo | AGPL-3.0 |
+| Prometheus, Alertmanager, Caddy, Grafana Alloy | Apache-2.0 |
+| OpenTelemetry SDKs (added to your images by `Dockerfile.observa`) | Apache-2.0 |
+| Vendored Go code in `internal/thirdparty/` (yaml.v3, bcrypt, blowfish) | MIT and Apache-2.0, BSD-3-Clause |
+
+Details, versions, the example shop's dependencies and a note on what the AGPL means here: [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).

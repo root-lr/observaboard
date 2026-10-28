@@ -1,0 +1,74 @@
+# ObservaBoard example shop: Django + PostgreSQL + Redis + Celery.
+# Started by `observa up --all-in-one --with-example`, or by hand:
+#   observa init && observa apply
+#   docker compose -f compose.yaml -f docker-compose.observa.yml up -d --build
+services:
+  web:
+    build: .
+    command: >-
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py seed &&
+             gunicorn shop.wsgi:application --bind 0.0.0.0:8000 --workers 3 --access-logfile -"
+    ports:
+      - "8000:8000"
+    environment: &app-env
+      DATABASE_URL: postgresql://shop:shop@db:5432/shop
+      REDIS_URL: redis://redis:6379/0
+      DJANGO_SETTINGS_MODULE: shop.settings
+      CHAOS_FILE: /tmp/chaos/state.json
+    volumes:
+      - chaos:/tmp/chaos
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: celery -A shop worker --loglevel=info --concurrency=2
+    environment: *app-env
+    volumes:
+      - chaos:/tmp/chaos
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: shop
+      POSTGRES_USER: shop
+      POSTGRES_PASSWORD: shop
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shop -d shop"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  redis:
+    image: redis:8-alpine
+    command: ["redis-server", "--maxmemory", "64mb", "--maxmemory-policy", "noeviction"]
+    restart: unless-stopped
+
+  # Traffic generator: simulates visitors (not monitored).
+  traffic:
+    build: .
+    command: python traffic/traffic.py
+    environment:
+      TARGET: http://web:8000
+      RATE: "4"
+    depends_on:
+      - web
+    restart: unless-stopped
+
+volumes:
+  pgdata: {}
+  chaos: {}

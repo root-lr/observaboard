@@ -1,0 +1,147 @@
+// Package instrument produces what a service needs for zero-code
+// OpenTelemetry instrumentation: environment variables, the wrapped start
+// command and the extra Dockerfile lines that install the SDK.
+package instrument
+
+import (
+	"fmt"
+	"sort"
+	"strings"
+
+	"github.com/root-lr/observaboard/internal/presets"
+)
+
+// AgentOTLPEndpoint is where applications send OTLP data: the agent container,
+// reachable by name on the shared `observa` Docker network.
+const AgentOTLPEndpoint = "http://observa-agent:4318"
+
+// NetworkName is the Docker network shared by the agent and monitored services.
+const NetworkName = "observa"
+
+// Python and Node packages installed in the derived image.
+var (
+	PythonPackages = []string{"opentelemetry-distro>=0.62b0", "opentelemetry-exporter-otlp>=1.41.0"}
+	NodePackages   = []string{"@opentelemetry/api", "@opentelemetry/auto-instrumentations-node"}
+)
+
+// NodeRegister is the Node.js preload module enabling zero-code instrumentation.
+const NodeRegister = "--require @opentelemetry/auto-instrumentations-node/register"
+
+// Target identifies a service to instrument.
+type Target struct {
+	Project, Env, Service, Preset, Runtime string
+	Healthcheck                            string
+}
+
+// Labels returns the Docker labels the agent uses to discover a service.
+func Labels(project, env, service, preset string) map[string]string {
+	return map[string]string{
+		"observa.enable":  "true",
+		"observa.project": project,
+		"observa.env":     env,
+		"observa.service": service,
+		"observa.preset":  preset,
+	}
+}
+
+// ResourceAttributes returns the OTEL_RESOURCE_ATTRIBUTES value. The agent
+// copies the observa.* attributes onto every metric as project/env/service/preset.
+func ResourceAttributes(t Target) string {
+	kv := [][2]string{
+		{"service.namespace", t.Project},
+		{"deployment.environment.name", t.Env},
+		{"observa.project", t.Project},
+		{"observa.env", t.Env},
+		{"observa.service", t.Service},
+		{"observa.preset", t.Preset},
+	}
+	var parts []string
+	for _, p := range kv {
+		parts = append(parts, p[0]+"="+p[1])
+	}
+	return strings.Join(parts, ",")
+}
+
+// Env returns the environment variables to add to the service. base is the
+// service's current environment, used to extend NODE_OPTIONS instead of
+// replacing it.
+func Env(t Target, base map[string]string) map[string]string {
+	env := map[string]string{
+		"OTEL_SERVICE_NAME":           t.Service,
+		"OTEL_RESOURCE_ATTRIBUTES":    ResourceAttributes(t),
+		"OTEL_EXPORTER_OTLP_ENDPOINT": AgentOTLPEndpoint,
+		"OTEL_EXPORTER_OTLP_PROTOCOL": "http/protobuf",
+		"OTEL_TRACES_EXPORTER":        "otlp",
+		// HTTP metrics come from span metrics computed by Tempo: SDK metrics would
+		// be wrong with pre-fork servers (several gunicorn workers export identical series).
+		"OTEL_METRICS_EXPORTER":         "none",
+		"OTEL_LOGS_EXPORTER":            "none",
+		"OTEL_SEMCONV_STABILITY_OPT_IN": "http",
+		"OTEL_TRACES_SAMPLER":           "parentbased_always_on",
+	}
+	switch t.Runtime {
+	case presets.RuntimePython:
+		env["OTEL_PYTHON_LOG_CORRELATION"] = "true"
+		if t.Healthcheck != "" {
+			env["OTEL_PYTHON_EXCLUDED_URLS"] = strings.Trim(t.Healthcheck, "/")
+		}
+	case presets.RuntimeNode:
+		opts := strings.TrimSpace(base["NODE_OPTIONS"])
+		if !strings.Contains(opts, "auto-instrumentations-node/register") {
+			opts = strings.TrimSpace(opts + " " + NodeRegister)
+		}
+		env["NODE_OPTIONS"] = opts
+		env["OTEL_NODE_RESOURCE_DETECTORS"] = "env,host,os,process,container"
+	}
+	return env
+}
+
+// EnvKeys returns sorted keys, for stable output.
+func EnvKeys(env map[string]string) []string {
+	var k []string
+	for key := range env {
+		k = append(k, key)
+	}
+	sort.Strings(k)
+	return k
+}
+
+// WrapCommand prefixes a Python start command with opentelemetry-instrument.
+// Child Python processes started by a shell inherit the instrumentation.
+func WrapCommand(runtime string, cmd []string) ([]string, bool) {
+	if runtime != presets.RuntimePython || len(cmd) == 0 {
+		return cmd, false
+	}
+	if cmd[0] == "opentelemetry-instrument" {
+		return cmd, true
+	}
+	return append([]string{"opentelemetry-instrument"}, cmd...), true
+}
+
+// DockerfileBlock returns the lines appended to the service Dockerfile to
+// install the OpenTelemetry SDK. user is the last USER of the image ("" if none).
+func DockerfileBlock(runtime, user string) (string, error) {
+	var b strings.Builder
+	b.WriteString("\n# --- Ajouté par `observa init` : instrumentation OpenTelemetry sans code ---\n")
+	b.WriteString("# Ce fichier est régénéré à chaque `observa init` : modifiez plutôt le Dockerfile d'origine.\n")
+	if user != "" {
+		b.WriteString("USER root\n")
+	}
+	switch runtime {
+	case presets.RuntimePython:
+		var q []string
+		for _, p := range PythonPackages {
+			q = append(q, fmt.Sprintf("%q", p))
+		}
+		b.WriteString("RUN python -m pip install --no-cache-dir " + strings.Join(q, " ") + " \\\n")
+		b.WriteString(" && opentelemetry-bootstrap -a install\n")
+	case presets.RuntimeNode:
+		b.WriteString("RUN npm install --no-save --omit=dev " + strings.Join(NodePackages, " ") + "\n")
+	default:
+		return "", fmt.Errorf("runtime %q non pris en charge pour l'instrumentation sans code", runtime)
+	}
+	if user != "" {
+		b.WriteString("USER " + user + "\n")
+	}
+	return b.String(), nil
+}

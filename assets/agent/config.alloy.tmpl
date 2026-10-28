@@ -44,10 +44,8 @@ loki.write "central" {
 }
 
 otelcol.auth.basic "central" {
-  client_auth {
-    username = {{q .AgentName}}
-    password = sys.env("OBSERVA_TOKEN")
-  }
+  username = {{q .AgentName}}
+  password = sys.env("OBSERVA_TOKEN")
 }
 
 otelcol.exporter.otlphttp "central" {

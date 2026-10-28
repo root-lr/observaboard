@@ -32,40 +32,40 @@ type command struct {
 
 func commands() []command {
 	return []command{
-		{name: "up", summary: "Lancer central + agent sur cette machine (--all-in-one)", run: runUp},
-		{name: "down", summary: "Arrêter l'installation all-in-one", run: runDown},
-		{name: "central", summary: "Installer et gérer le serveur central", sub: []command{
-			{name: "install", summary: "Installer le central (Grafana, Prometheus, Loki, Tempo, Alertmanager, Caddy)", run: runCentralInstall},
-			{name: "reload", summary: "Régénérer la config depuis central.yaml et recharger", run: runCentralReload},
-			{name: "upgrade", summary: "Mettre à jour les images en conservant données et config", run: runCentralUpgrade},
-			{name: "status", summary: "État des composants du central", run: runCentralStatus},
-			{name: "ca", summary: "Afficher le certificat de l'autorité interne (mode --ip)", run: runCentralCA},
+		{name: "up", summary: "Run central + agent on this machine (--all-in-one)", run: runUp},
+		{name: "down", summary: "Stop the all-in-one install", run: runDown},
+		{name: "central", summary: "Install and manage the central server", sub: []command{
+			{name: "install", summary: "Install the central (Grafana, Prometheus, Loki, Tempo, Alertmanager, Caddy)", run: runCentralInstall},
+			{name: "reload", summary: "Regenerate the config from central.yaml and reload", run: runCentralReload},
+			{name: "upgrade", summary: "Update images, keeping data and config", run: runCentralUpgrade},
+			{name: "status", summary: "Show the status of central components", run: runCentralStatus},
+			{name: "ca", summary: "Print the internal CA certificate (--ip mode)", run: runCentralCA},
 		}},
-		{name: "token", summary: "Gérer les tokens des agents (sur le central)", sub: []command{
-			{name: "create", summary: "Créer un token pour un agent : observa token create <agent>", run: runTokenCreate},
-			{name: "list", summary: "Lister les tokens", run: runTokenList},
-			{name: "revoke", summary: "Révoquer le token d'un agent : observa token revoke <agent>", run: runTokenRevoke},
+		{name: "token", summary: "Manage agent tokens (on the central)", sub: []command{
+			{name: "create", summary: "Create a token for an agent: observa token create <agent>", run: runTokenCreate},
+			{name: "list", summary: "List tokens", run: runTokenList},
+			{name: "revoke", summary: "Revoke an agent's token: observa token revoke <agent>", run: runTokenRevoke},
 		}},
-		{name: "agent", summary: "Installer et gérer l'agent d'un serveur", sub: []command{
-			{name: "install", summary: "Installer l'agent : --central <url> --token <token>", run: runAgentInstall},
-			{name: "reload", summary: "Régénérer la config de l'agent et la recharger", run: runAgentReload},
-			{name: "status", summary: "État de l'agent et services découverts", run: runAgentStatus},
-			{name: "env", summary: "Gérer les secrets de l'agent : observa agent env set NOM=valeur", run: runAgentEnv},
+		{name: "agent", summary: "Install and manage a server's agent", sub: []command{
+			{name: "install", summary: "Install the agent: --central <url> --token <token>", run: runAgentInstall},
+			{name: "reload", summary: "Regenerate the agent config and reload it", run: runAgentReload},
+			{name: "status", summary: "Show agent status and discovered services", run: runAgentStatus},
+			{name: "env", summary: "Manage agent secrets: observa agent env set NAME=value", run: runAgentEnv},
 		}},
-		{name: "init", summary: "Détecter la stack d'un projet et générer observa.yaml + l'override", run: runInit},
-		{name: "validate", summary: "Valider observa.yaml", run: runValidate},
-		{name: "apply", summary: "Enregistrer le projet auprès de l'agent local (seuils, routage, exporters)", run: runApply},
-		{name: "attach", summary: "Surveiller un conteneur existant sans labels : observa attach <conteneur>", run: runAttach},
-		{name: "detach", summary: "Retirer une règle observa attach : observa detach <conteneur>", run: runDetach},
-		{name: "preset", summary: "Lister ou décrire les presets", sub: []command{
-			{name: "list", summary: "Lister les presets", run: runPresetList},
-			{name: "show", summary: "Décrire un preset : observa preset show <nom>", run: runPresetShow},
+		{name: "init", summary: "Detect a project's stack and generate observa.yaml + the override", run: runInit},
+		{name: "validate", summary: "Validate observa.yaml", run: runValidate},
+		{name: "apply", summary: "Register the project with the local agent (thresholds, routing, exporters)", run: runApply},
+		{name: "attach", summary: "Monitor an existing container without labels: observa attach <container>", run: runAttach},
+		{name: "detach", summary: "Remove an observa attach rule: observa detach <container>", run: runDetach},
+		{name: "preset", summary: "List or describe presets", sub: []command{
+			{name: "list", summary: "List presets", run: runPresetList},
+			{name: "show", summary: "Describe a preset: observa preset show <name>", run: runPresetShow},
 		}},
-		{name: "doctor", summary: "Diagnostiquer l'installation (agent, central, projet)", run: runDoctor},
-		{name: "alert", summary: "Outils d'alerte", sub: []command{
-			{name: "test", summary: "Envoyer une alerte de test pour vérifier les notifications", run: runAlertTest},
+		{name: "doctor", summary: "Diagnose the install (agent, central, project)", run: runDoctor},
+		{name: "alert", summary: "Alerting tools", sub: []command{
+			{name: "test", summary: "Send a test alert to check notifications", run: runAlertTest},
 		}},
-		{name: "version", summary: "Afficher la version et les images utilisées", run: runVersion},
+		{name: "version", summary: "Print the version and the images in use", run: runVersion},
 	}
 }
 
@@ -116,26 +116,26 @@ func dispatch(cmds []command, args []string, prefix string) error {
 		return c.run(args[1:])
 	}
 	printHelp(cmds, prefix)
-	return usagef("commande inconnue : %s %s", prefix, args[0])
+	return usagef("unknown command: %s %s", prefix, args[0])
 }
 
 func printHelp(cmds []command, prefix string) {
 	if prefix == "observa" {
-		fmt.Fprintf(stdout, "ObservaBoard %s — observabilité self-hosted en une commande.\n\n", version.Version)
+		fmt.Fprintf(stdout, "ObservaBoard %s — self-hosted observability in one command.\n\n", version.Version)
 	}
-	fmt.Fprintf(stdout, "Usage : %s <commande> [options]\n\nCommandes :\n", prefix)
+	fmt.Fprintf(stdout, "Usage: %s <command> [options]\n\nCommands:\n", prefix)
 	for _, c := range cmds {
 		fmt.Fprintf(stdout, "  %-10s %s\n", c.name, c.summary)
 	}
-	fmt.Fprintf(stdout, "\nAide d'une commande : %s <commande> --help · Option globale : --dry-run (affiche les commandes docker sans les exécuter)\n", prefix)
+	fmt.Fprintf(stdout, "\nCommand help: %s <command> --help · Global option: --dry-run (print docker commands without running them)\n", prefix)
 }
 
-// newFlags creates a FlagSet with French usage output.
+// newFlags creates a FlagSet with a custom usage output.
 func newFlags(name, usage string) *flag.FlagSet {
 	fs := flag.NewFlagSet(name, flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() {
-		fmt.Fprintf(stderr, "Usage : %s\n\nOptions :\n", usage)
+		fmt.Fprintf(stderr, "Usage: %s\n\nOptions:\n", usage)
 		fs.PrintDefaults()
 	}
 	return fs
@@ -188,9 +188,9 @@ func confirm(question string, assumeYes bool) bool {
 	if assumeYes {
 		return true
 	}
-	fmt.Fprintf(stdout, "%s [o/N] ", question)
+	fmt.Fprintf(stdout, "%s [y/N] ", question)
 	line := strings.ToLower(readLine())
-	return line == "o" || line == "oui" || line == "y" || line == "yes"
+	return line == "y" || line == "yes"
 }
 
 // ask reads a line with a default value.
@@ -210,13 +210,13 @@ func ask(question, def string, assumeYes bool) string {
 func requireWritable(dir string) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		if errors.Is(err, os.ErrPermission) {
-			return fmt.Errorf("impossible d'écrire dans %s : relancez avec sudo, ou choisissez un autre dossier avec --dir", dir)
+			return fmt.Errorf("cannot write to %s: rerun with sudo, or choose another directory with --dir", dir)
 		}
 		return err
 	}
 	probe := filepath.Join(dir, ".observa-write-test")
 	if err := os.WriteFile(probe, nil, 0o600); err != nil {
-		return fmt.Errorf("impossible d'écrire dans %s : relancez avec sudo, ou choisissez un autre dossier avec --dir", dir)
+		return fmt.Errorf("cannot write to %s: rerun with sudo, or choose another directory with --dir", dir)
 	}
 	return os.Remove(probe)
 }
@@ -231,7 +231,7 @@ func sortedKeys[V any](m map[string]V) []string {
 }
 
 func runVersion(args []string) error {
-	fmt.Fprintf(stdout, "observa %s\n\nImages :\n", version.Version)
+	fmt.Fprintf(stdout, "observa %s\n\nImages:\n", version.Version)
 	im := version.Images
 	for _, l := range [][2]string{
 		{"Grafana", im.Grafana}, {"Prometheus", im.Prometheus}, {"Alertmanager", im.Alertmanager},

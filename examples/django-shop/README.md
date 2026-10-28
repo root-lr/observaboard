@@ -1,16 +1,16 @@
-# Boutique d'exemple
+# Example shop
 
-Une petite boutique Django qui sert de terrain d'entraînement : PostgreSQL, Redis, un worker Celery, un générateur de trafic, et des pannes simulées à la demande.
+A small Django shop that serves as a training ground: PostgreSQL, Redis, a Celery worker, a traffic generator, and simulated failures on demand.
 
-## Lancer
+## Run
 
-Le plus simple, depuis la racine du dépôt :
+The easiest way, from the repository root:
 
 ```bash
 bin/observa up --all-in-one --with-example
 ```
 
-À la main, avec un agent déjà installé sur la machine :
+By hand, with an agent already installed on the machine:
 
 ```bash
 observa init --project boutique --env local --yes
@@ -19,30 +19,30 @@ observa agent env set OBSERVA_SECRET_BOUTIQUE_LOCAL_DB='postgresql://shop:shop@b
 docker compose -f compose.yaml -f docker-compose.observa.yml up -d --build
 ```
 
-La boutique répond sur http://localhost:8000.
+The shop listens on http://localhost:8000.
 
-## Pages et API
+## Pages and API
 
-| Route | Comportement |
+| Route | Behavior |
 | --- | --- |
-| `/` | liste HTML, volontairement en N+1 : une rafale de requêtes SQL visible dans les traces |
-| `/api/products/`, `/api/products/<id>/` | catalogue JSON |
-| `POST /api/orders/` | commande, appel à un « prestataire de paiement » simulé, puis tâche Celery d'envoi de confirmation |
-| `/health/` | sonde, exclue des traces |
+| `/` | HTML list, deliberately N+1: a burst of SQL queries visible in traces |
+| `/api/products/`, `/api/products/<id>/` | JSON catalog |
+| `POST /api/orders/` | order, call to a simulated "payment provider", then a Celery task that sends the confirmation |
+| `/health/` | probe, excluded from traces |
 
-## Simuler des pannes
+## Simulate failures
 
 ```bash
 docker compose exec web python manage.py chaos <mode> [--minutes 10]
 ```
 
-| Mode | Effet | Alerte attendue |
+| Mode | Effect | Expected alert |
 | --- | --- | --- |
-| `errors` | 30 % des appels à `/api/products/` renvoient 500 | ObservaHighErrorRate (≈ 5 min) |
-| `latency` | +1,5 s sur les pages produits et les commandes | ObservaHighLatency (≈ 10 min, seuil 800 ms) |
-| `dependency` | le paiement externe ne répond plus (timeout 3 s, réponse 502) | ObservaHighErrorRate, latence |
-| `tasks` | les tâches Celery échouent | ObservaCeleryTaskFailures (≈ 10 min) |
-| `status` | affiche les pannes en cours | — |
-| `reset` | arrête toutes les pannes | résolution des alertes |
+| `errors` | 30% of calls to `/api/products/` return 500 | ObservaHighErrorRate (≈ 5 min) |
+| `latency` | +1.5 s on product pages and orders | ObservaHighLatency (≈ 10 min, threshold 800 ms) |
+| `dependency` | the external payment provider stops responding (3 s timeout, 502 response) | ObservaHighErrorRate, latency |
+| `tasks` | Celery tasks fail | ObservaCeleryTaskFailures (≈ 10 min) |
+| `status` | shows active failures | — |
+| `reset` | stops all failures | alerts resolve |
 
-Pour chaque alerte, suivez le lien *runbook* de la notification ou ouvrez `/runbooks/` dans Grafana, et entraînez-vous à retrouver la cause dans les dashboards, les traces et les logs.
+For each alert, follow the *runbook* link in the notification or open `/runbooks/` in Grafana, and practice tracking down the cause in the dashboards, traces and logs.

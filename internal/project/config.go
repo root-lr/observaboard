@@ -77,7 +77,7 @@ func Parse(data []byte) (*Config, error) {
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	dec.KnownFields(true)
 	if err := dec.Decode(&c); err != nil {
-		return nil, fmt.Errorf("observa.yaml illisible : %w", err)
+		return nil, fmt.Errorf("cannot read observa.yaml: %w", err)
 	}
 	if errs := c.Validate(); len(errs) > 0 {
 		return &c, ValidationError(errs)
@@ -89,7 +89,7 @@ func Parse(data []byte) (*Config, error) {
 type ValidationError []string
 
 func (v ValidationError) Error() string {
-	return "observa.yaml invalide :\n  - " + strings.Join(v, "\n  - ")
+	return "invalid observa.yaml:\n  - " + strings.Join(v, "\n  - ")
 }
 
 // Validate checks the configuration and returns every problem found.
@@ -98,84 +98,84 @@ func (c *Config) Validate() []string {
 	add := func(format string, a ...any) { errs = append(errs, fmt.Sprintf(format, a...)) }
 
 	if c.Version != 1 {
-		add("version doit valoir 1 (trouvé : %d)", c.Version)
+		add("version must be 1 (found: %d)", c.Version)
 	}
 	if !SlugRE.MatchString(c.Project) {
-		add("project %q : minuscules, chiffres et tirets uniquement (1 à 40 caractères)", c.Project)
+		add("project %q: lowercase letters, digits and hyphens only (1 to 40 characters)", c.Project)
 	}
 	if !SlugRE.MatchString(c.Env) {
-		add("env %q : minuscules, chiffres et tirets uniquement (ex. prod, staging)", c.Env)
+		add("env %q: lowercase letters, digits and hyphens only (e.g. prod, staging)", c.Env)
 	}
 	if len(c.Services) == 0 {
-		add("services : au moins un service est requis")
+		add("services: at least one service is required")
 	}
 	for _, name := range c.ServiceNames() {
 		s := c.Services[name]
 		where := "services." + name
 		if s == nil {
-			add("%s : définition vide", where)
+			add("%s: empty definition", where)
 			continue
 		}
 		if !ServiceRE.MatchString(name) {
-			add("%s : nom invalide (lettres, chiffres, _ . -)", where)
+			add("%s: invalid name (letters, digits, _ . -)", where)
 		}
 		p, ok := presets.Get(s.Preset)
 		if !ok {
-			add("%s.preset %q inconnu (disponibles : %s)", where, s.Preset, strings.Join(presets.Names(), ", "))
+			add("%s.preset %q is unknown (available: %s)", where, s.Preset, strings.Join(presets.Names(), ", "))
 			continue
 		}
 		switch s.Runtime {
 		case "", presets.RuntimePython, presets.RuntimeNode:
 		default:
-			add("%s.runtime %q : valeurs possibles python, node", where, s.Runtime)
+			add("%s.runtime %q: allowed values are python, node", where, s.Runtime)
 		}
 		switch s.Instrumentation {
 		case "", presets.InstrNone, presets.InstrEBPF:
 		case presets.InstrOTel:
 			rt := s.EffectiveRuntime()
 			if rt == "" {
-				add("%s.instrumentation otel : précisez runtime (python ou node)", where)
+				add("%s.instrumentation otel: set runtime (python or node)", where)
 			} else if p.Runtime != "" && p.Runtime != rt {
-				add("%s.instrumentation otel : le preset %s attend le runtime %s", where, p.Name, p.Runtime)
+				add("%s.instrumentation otel: preset %s expects runtime %s", where, p.Name, p.Runtime)
 			}
 			if p.Exporter != presets.ExporterNone {
-				add("%s.instrumentation otel : sans objet pour le preset %s", where, p.Name)
+				add("%s.instrumentation otel: not applicable to preset %s", where, p.Name)
 			}
 		default:
-			add("%s.instrumentation %q : valeurs possibles otel, ebpf, none", where, s.Instrumentation)
+			add("%s.instrumentation %q: allowed values are otel, ebpf, none", where, s.Instrumentation)
 		}
 		if s.Port < 0 || s.Port > 65535 {
-			add("%s.port %d hors limites", where, s.Port)
+			add("%s.port %d out of range", where, s.Port)
 		}
 		if s.Instrumentation == presets.InstrEBPF && s.EffectivePort() == 0 {
-			add("%s.instrumentation ebpf : port requis", where)
+			add("%s.instrumentation ebpf: port required", where)
 		}
 		if s.Healthcheck != "" && !strings.HasPrefix(s.Healthcheck, "/") {
-			add("%s.healthcheck doit commencer par / (ex. /health/)", where)
+			add("%s.healthcheck must start with / (e.g. /health/)", where)
 		}
 		if s.SecretEnv != "" && !envNameRE.MatchString(s.SecretEnv) {
-			add("%s.secret_env %q : nom de variable invalide", where, s.SecretEnv)
+			add("%s.secret_env %q: invalid variable name", where, s.SecretEnv)
 		}
 		for _, k := range sortedKeys(s.Alerts) {
 			param, ok := p.Param(k)
 			if !ok {
 				if len(p.Params) == 0 {
-					add("%s.alerts.%s : le preset %s n'a pas de seuil surchargeable", where, k, p.Name)
+					add("%s.alerts.%s: preset %s has no overridable threshold", where, k, p.Name)
 				} else {
-					add("%s.alerts.%s inconnu pour le preset %s (possibles : %s)", where, k, p.Name, strings.Join(p.ParamKeys(), ", "))
+					add("%s.alerts.%s is unknown for preset %s (allowed: %s)", where, k, p.Name, strings.Join(p.ParamKeys(), ", "))
 				}
 				continue
 			}
 			v := s.Alerts[k]
 			if v < param.Min || v > param.Max {
-				add("%s.alerts.%s = %g hors limites [%g, %g]", where, k, v, param.Min, param.Max)
+				add("%s.alerts.%s = %g out of range [%g, %g]", where, k, v, param.Min, param.Max)
 			}
 		}
 	}
 	for sev, chans := range map[string][]string{"critical": c.Notifications.Critical, "warning": c.Notifications.Warning} {
 		for _, ch := range chans {
 			if !SlugRE.MatchString(ch) {
-				add("notifications.%s : canal %q invalide (minuscules, chiffres et tirets)", sev, ch)
+				add("notifications.%s: invalid channel %q (lowercase letters, digits and hyphens)", sev, ch)
 			}
 		}
 	}
@@ -253,9 +253,9 @@ func (c *Config) EffectiveSecretEnv(name string) string {
 // Marshal renders the config as commented YAML.
 func (c *Config) Marshal() ([]byte, error) {
 	var b bytes.Buffer
-	b.WriteString("# Description du projet pour ObservaBoard.\n")
-	b.WriteString("# Référence : https://github.com/root-lr/observaboard/blob/main/docs/observa-yaml.md\n")
-	b.WriteString("# Vérifier : observa validate — Appliquer sur le serveur : observa apply\n")
+	b.WriteString("# Project description for ObservaBoard.\n")
+	b.WriteString("# Reference: https://github.com/root-lr/observaboard/blob/main/docs/observa-yaml.md\n")
+	b.WriteString("# Check: observa validate. Apply on the server: observa apply\n")
 	enc := yaml.NewEncoder(&b)
 	enc.SetIndent(2)
 	if err := enc.Encode(c); err != nil {
@@ -289,4 +289,4 @@ func sortedKeys[V any](m map[string]V) []string {
 }
 
 // ErrNotFound is returned when no observa.yaml exists.
-var ErrNotFound = errors.New("aucun observa.yaml dans ce dossier (lancez observa init)")
+var ErrNotFound = errors.New("no observa.yaml in this directory (run observa init)")

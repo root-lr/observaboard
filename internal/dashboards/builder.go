@@ -336,7 +336,7 @@ func (d *Dashboard) panelJSON(id int, p Panel, gp map[string]any) map[string]any
 		overrides = append(overrides, map[string]any{
 			"matcher": map[string]any{"id": "byName", "options": field},
 			"properties": []map[string]any{{
-				"id": "links", "value": []map[string]any{{"title": "Ouvrir", "url": url}},
+				"id": "links", "value": []map[string]any{{"title": "Open", "url": url}},
 			}},
 		})
 	}

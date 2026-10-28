@@ -1,28 +1,28 @@
-# ObservaHostDiskFull — disque presque plein
+# ObservaHostDiskFull — disk almost full
 
-**Sévérité :** avertissement · **Déclenchement :** un système de fichiers du serveur est rempli à plus de 85 % depuis 10 minutes.
+**Severity:** warning · **Fires when:** a filesystem on the server has been more than 85% full for 10 minutes.
 
-## Ce que signifie l'alerte
+## What the alert means
 
-L'espace libre diminue. Au-delà de 95 %, les bases de données, Docker et les logs commencent à échouer.
+Free space is shrinking. Beyond 95%, databases, Docker and logs start failing.
 
-## Impact pour les utilisateurs
+## User impact
 
-Aucun tant qu'il reste de la place ; ensuite, erreurs d'écriture, base arrêtée, déploiements impossibles.
+None while space remains; then write errors, a stopped database, impossible deployments.
 
-## Dashboards à ouvrir
+## Dashboards to open
 
-1. **Serveurs** : *Disques remplis* pour voir la vitesse de remplissage.
+1. **Servers**: *Disk usage* to see how fast it fills up.
 
-## Requêtes utiles
+## Useful queries
 
-Estimation : le disque sera-t-il plein dans 24 h ?
+Forecast: will the disk be full within 24 h?
 
 ```promql
 predict_linear(node_filesystem_avail_bytes{host="HOST", mountpoint="/"}[6h], 24 * 3600) < 0
 ```
 
-Sur le serveur :
+On the server:
 
 ```bash
 df -h
@@ -30,21 +30,21 @@ docker system df
 sudo du -xh / --max-depth=2 2>/dev/null | sort -h | tail -20
 ```
 
-## Causes probables
+## Likely causes
 
-- **Images et conteneurs Docker inutilisés** accumulés au fil des déploiements.
-- **Logs** de conteneurs sans rotation.
-- **Base de données** qui grossit, sauvegardes locales qui s'accumulent.
-- **Volumes** de données du central (si c'est le serveur central : rétention trop longue).
+- **Unused Docker images and containers** piling up over deployments.
+- Container **logs** without rotation.
+- A growing **database**, local backups piling up.
+- Central **data volumes** (if this is the central server: retention too long).
 
 ## Actions
 
-1. Nettoyez Docker : `docker image prune -a` (images non utilisées), `docker builder prune`.
-2. Activez la rotation des logs Docker (`max-size`, `max-file`).
-3. Déplacez ou purgez les anciennes sauvegardes.
-4. Sur le central : réduisez `retention` dans `central.yaml` puis `observa central reload`.
-5. Agrandissez le disque si la croissance est normale.
+1. Clean up Docker: `docker image prune -a` (unused images), `docker builder prune`.
+2. Enable Docker log rotation (`max-size`, `max-file`).
+3. Move or purge old backups.
+4. On the central: reduce `retention` in `central.yaml`, then `observa central reload`.
+5. Grow the disk if the growth is normal.
 
-## Vérifier le retour à la normale
+## Verify recovery
 
-- *Disques remplis* repasse sous 85 %.
+- *Disk usage* drops back below 85%.

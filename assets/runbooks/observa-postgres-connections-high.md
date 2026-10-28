@@ -1,47 +1,47 @@
-# ObservaPostgresConnectionsHigh — connexions PostgreSQL presque épuisées
+# ObservaPostgresConnectionsHigh — PostgreSQL connections almost exhausted
 
-**Sévérité :** avertissement · **Déclenchement :** connexions ouvertes au-dessus du seuil de `max_connections` pendant 10 minutes.
-**Seuil :** 80 % par défaut, modifiable avec `alerts.connections_pct` dans `observa.yaml`.
+**Severity:** warning · **Fires when:** open connections stay above the threshold of `max_connections` for 10 minutes.
+**Threshold:** 80% by default, configurable with `alerts.connections_pct` in `observa.yaml`.
 
-## Ce que signifie l'alerte
+## What the alert means
 
-Le nombre de connexions approche la limite. Au-delà, PostgreSQL refuse les nouvelles connexions et les applications renvoient des erreurs.
+The number of connections is approaching the limit. Beyond it, PostgreSQL refuses new connections and applications return errors.
 
-## Impact pour les utilisateurs
+## User impact
 
-Aucun pour l'instant ; erreurs franches si la limite est atteinte.
+None for now; outright errors if the limit is reached.
 
-## Dashboards à ouvrir
+## Dashboards to open
 
-1. **PostgreSQL** : *Connexions par état*. Beaucoup de connexions `idle` = connexions gardées ouvertes sans travail ; beaucoup de `idle in transaction` = transactions jamais terminées.
-2. **Plus longue transaction active**.
+1. **PostgreSQL**: *Connections by state*. Many `idle` connections = connections kept open without work; many `idle in transaction` = transactions never finished.
+2. **Longest active transaction**.
 
-## Requêtes utiles
+## Useful queries
 
 ```promql
-sum by (state) (pg_stat_activity_count{project="PROJET", env="ENV", service="SERVICE"})
+sum by (state) (pg_stat_activity_count{project="PROJECT", env="ENV", service="SERVICE"})
 ```
 
-Dans la base, qui consomme les connexions :
+In the database, who is using the connections:
 
 ```sql
 SELECT application_name, usename, state, count(*)
 FROM pg_stat_activity GROUP BY 1, 2, 3 ORDER BY 4 DESC;
 ```
 
-## Causes probables
+## Likely causes
 
-- **Trop de workers** applicatifs, chacun avec son pool de connexions.
-- **Connexions persistantes** (`CONN_MAX_AGE` en Django) multipliées par le nombre de processus.
-- **Fuite de connexions** ou transactions jamais fermées.
+- **Too many application workers**, each with its own connection pool.
+- **Persistent connections** (`CONN_MAX_AGE` in Django) multiplied by the number of processes.
+- **Connection leak** or transactions never closed.
 
 ## Actions
 
-1. Calculez le besoin : processus × connexions par processus, pour toutes les applications.
-2. Réduisez `CONN_MAX_AGE` ou le nombre de workers, ou placez PgBouncer devant la base.
-3. Terminez les transactions bloquées (`pg_terminate_backend`) après analyse.
-4. En dernier recours, augmentez `max_connections` (coût mémoire).
+1. Work out the need: processes × connections per process, across all applications.
+2. Reduce `CONN_MAX_AGE` or the number of workers, or put PgBouncer in front of the database.
+3. Terminate stuck transactions (`pg_terminate_backend`) after analysis.
+4. As a last resort, increase `max_connections` (costs memory).
 
-## Vérifier le retour à la normale
+## Verify recovery
 
-- La part des connexions utilisées redescend sous le seuil.
+- The share of used connections drops back below the threshold.

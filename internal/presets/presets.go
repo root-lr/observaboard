@@ -66,61 +66,61 @@ type Preset struct {
 
 var httpParams = []Param{
 	{Key: "latency_p95_ms", Metric: "http_latency_p95_seconds", Default: 1000, Scale: 0.001, Min: 10, Max: 600000,
-		Description: "Latence p95 maximale avant alerte (millisecondes)"},
+		Description: "Maximum p95 latency before alerting (milliseconds)"},
 	{Key: "error_rate_pct", Metric: "http_error_ratio", Default: 5, Scale: 0.01, Min: 0.01, Max: 100,
-		Description: "Part maximale de réponses 5xx avant alerte (pourcentage)"},
+		Description: "Maximum share of 5xx responses before alerting (percent)"},
 }
 
 var all = []Preset{
 	{
 		Name: "django", Title: "Django", HTTP: true, Runtime: RuntimePython, DefaultPort: 8000,
-		Description: "Application Django (gunicorn, uvicorn ou manage.py). Traces des vues, requêtes SQL et appels sortants.",
+		Description: "Django application (gunicorn, uvicorn or manage.py). Traces of views, SQL queries and outgoing calls.",
 		Dashboard:   "observa-http",
 		Alerts:      []string{"ObservaHighErrorRate", "ObservaHighLatency", "ObservaServiceDown"},
 		Params:      httpParams,
 	},
 	{
 		Name: "fastapi", Title: "FastAPI", HTTP: true, Runtime: RuntimePython, DefaultPort: 8000,
-		Description: "Application FastAPI / Starlette (uvicorn, gunicorn). Traces des routes et appels sortants.",
+		Description: "FastAPI / Starlette application (uvicorn, gunicorn). Traces of routes and outgoing calls.",
 		Dashboard:   "observa-http",
 		Alerts:      []string{"ObservaHighErrorRate", "ObservaHighLatency", "ObservaServiceDown"},
 		Params:      httpParams,
 	},
 	{
 		Name: "celery", Title: "Celery", Runtime: RuntimePython,
-		Description: "Worker Celery. Durée et échecs des tâches (traces), file d'attente via le preset redis.",
+		Description: "Celery worker. Task duration and failures (traces), queue via the redis preset.",
 		Dashboard:   "observa-celery",
 		Alerts:      []string{"ObservaCeleryTaskFailures", "ObservaServiceDown"},
 		Params: []Param{
 			{Key: "task_failure_pct", Metric: "celery_task_failure_ratio", Default: 10, Scale: 0.01, Min: 0.01, Max: 100,
-				Description: "Part maximale de tâches en échec avant alerte (pourcentage)"},
+				Description: "Maximum share of failed tasks before alerting (percent)"},
 		},
 	},
 	{
 		Name: "postgres", Title: "PostgreSQL", Exporter: ExporterPostgres, DefaultPort: 5432,
-		Description: "Base PostgreSQL. Connexions, transactions, cache, taille, verrous.",
+		Description: "PostgreSQL database. Connections, transactions, cache, size, locks.",
 		Dashboard:   "observa-postgres",
 		Alerts:      []string{"ObservaPostgresDown", "ObservaPostgresConnectionsHigh", "ObservaServiceDown"},
 		Params: []Param{
 			{Key: "connections_pct", Metric: "postgres_connections_ratio", Default: 80, Scale: 0.01, Min: 1, Max: 100,
-				Description: "Part maximale de max_connections utilisée avant alerte (pourcentage)"},
+				Description: "Maximum share of max_connections in use before alerting (percent)"},
 		},
 	},
 	{
 		Name: "redis", Title: "Redis", Exporter: ExporterRedis, DefaultPort: 6379,
-		Description: "Redis ou Valkey. Mémoire, clients, commandes, longueur de la file Celery.",
+		Description: "Redis or Valkey. Memory, clients, commands, Celery queue length.",
 		Dashboard:   "observa-redis",
 		Alerts:      []string{"ObservaRedisDown", "ObservaRedisMemoryHigh", "ObservaQueueBacklog", "ObservaServiceDown"},
 		Params: []Param{
 			{Key: "memory_pct", Metric: "redis_memory_ratio", Default: 90, Scale: 0.01, Min: 1, Max: 100,
-				Description: "Part maximale de maxmemory utilisée avant alerte (pourcentage)"},
+				Description: "Maximum share of maxmemory in use before alerting (percent)"},
 			{Key: "queue_length", Metric: "queue_length", Default: 100, Scale: 1, Min: 1, Max: 100000000,
-				Description: "Nombre maximal de messages en attente dans la file `celery` avant alerte"},
+				Description: "Maximum number of messages waiting in the `celery` queue before alerting"},
 		},
 	},
 	{
-		Name: "generic", Title: "Générique", HTTP: true,
-		Description: "Tout autre conteneur : logs, ressources, disponibilité. Métriques HTTP si l'app est instrumentée (Node.js, eBPF).",
+		Name: "generic", Title: "Generic", HTTP: true,
+		Description: "Any other container: logs, resources, availability. HTTP metrics if the app is instrumented (Node.js, eBPF).",
 		Dashboard:   "observa-container",
 		Alerts:      []string{"ObservaServiceDown", "ObservaContainerRestarting", "ObservaHighErrorRate", "ObservaHighLatency"},
 		Params:      httpParams,
@@ -210,18 +210,18 @@ func AllThresholdParams() []Param {
 func (p Preset) Describe() string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s (%s)\n  %s\n", p.Name, p.Title, p.Description)
-	fmt.Fprintf(&b, "  Dashboard : %s\n", p.Dashboard)
+	fmt.Fprintf(&b, "  Dashboard: %s\n", p.Dashboard)
 	if p.Runtime != "" {
-		fmt.Fprintf(&b, "  Instrumentation sans code : %s (OpenTelemetry)\n", p.Runtime)
+		fmt.Fprintf(&b, "  Zero-code instrumentation: %s (OpenTelemetry)\n", p.Runtime)
 	}
 	if p.Exporter != "" {
-		fmt.Fprintf(&b, "  Exporter exécuté par l'agent : %s\n", p.Exporter)
+		fmt.Fprintf(&b, "  Exporter run by the agent: %s\n", p.Exporter)
 	}
-	fmt.Fprintf(&b, "  Alertes : %s\n", strings.Join(p.Alerts, ", "))
+	fmt.Fprintf(&b, "  Alerts: %s\n", strings.Join(p.Alerts, ", "))
 	if len(p.Params) > 0 {
-		b.WriteString("  Seuils surchargeables (services.<nom>.alerts dans observa.yaml) :\n")
+		b.WriteString("  Overridable thresholds (services.<name>.alerts in observa.yaml):\n")
 		for _, q := range p.Params {
-			fmt.Fprintf(&b, "    %-18s défaut %-8g %s\n", q.Key, q.Default, q.Description)
+			fmt.Fprintf(&b, "    %-18s default %-8g %s\n", q.Key, q.Default, q.Description)
 		}
 	}
 	return b.String()

@@ -17,14 +17,14 @@ import (
 )
 
 func runInit(args []string) error {
-	fs := newFlags("observa init", "observa init [--project <nom>] [--env prod] [--yes] [--runtime docker --service api=django ...]")
-	dirFlag := fs.String("dir", ".", "dossier du projet")
-	projectName := fs.String("project", "", "nom du projet (défaut : nom du dossier ou valeur existante)")
-	env := fs.String("env", "", "environnement (défaut : prod ou valeur existante)")
-	yes := fs.Bool("yes", false, "accepter les choix détectés sans poser de question")
-	runtime := fs.String("runtime", "auto", "compose (fichier compose) ou docker (conteneurs lancés avec docker run) ; auto = compose si présent")
+	fs := newFlags("observa init", "observa init [--project <name>] [--env prod] [--yes] [--runtime docker --service api=django ...]")
+	dirFlag := fs.String("dir", ".", "project directory")
+	projectName := fs.String("project", "", "project name (default: directory name or existing value)")
+	env := fs.String("env", "", "environment (default: prod or existing value)")
+	yes := fs.Bool("yes", false, "accept detected choices without prompting")
+	runtime := fs.String("runtime", "auto", "compose (compose file) or docker (containers started with docker run); auto = compose if present")
 	var services multiFlag
-	fs.Var(&services, "service", "mode docker : service à déclarer, nom=preset[:python|node] (répétable)")
+	fs.Var(&services, "service", "docker mode: service to declare, name=preset[:python|node] (repeatable)")
 	if _, err := parse(fs, args); err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func runInit(args []string) error {
 			if !errors.As(err, &ve) {
 				return err
 			}
-			warn("observa.yaml existant invalide, les erreurs seront corrigées si possible")
+			warn("existing observa.yaml is invalid; errors will be fixed where possible")
 		}
 		if c != nil {
 			cfg = c
@@ -58,13 +58,13 @@ func runInit(args []string) error {
 		cfg.Project = *projectName
 	}
 	if cfg.Project == "" {
-		cfg.Project = ask("Nom du projet ?", slugify(filepath.Base(dir)), *yes)
+		cfg.Project = ask("Project name?", slugify(filepath.Base(dir)), *yes)
 	}
 	if *env != "" {
 		cfg.Env = *env
 	}
 	if cfg.Env == "" {
-		cfg.Env = ask("Environnement ?", "prod", *yes)
+		cfg.Env = ask("Environment?", "prod", *yes)
 	}
 
 	composePath := compose.Find(dir)
@@ -79,25 +79,25 @@ func runInit(args []string) error {
 	switch mode {
 	case "compose":
 		if composePath == "" {
-			return fmt.Errorf("aucun fichier compose dans %s (compose.yaml, docker-compose.yml…) ; pour des conteneurs docker run : --runtime docker --service nom=preset", dir)
+			return fmt.Errorf("no compose file in %s (compose.yaml, docker-compose.yml…); for docker run containers: --runtime docker --service name=preset", dir)
 		}
 		f, err := compose.Load(composePath)
 		if err != nil {
 			return err
 		}
-		step("Analyse de %s", filepath.Base(composePath))
-		fmt.Fprintf(stdout, "\n%-16s %-10s %-8s %-6s %s\n", "SERVICE", "PRESET", "RUNTIME", "PORT", "DÉTECTÉ PAR")
+		step("Analyzing %s", filepath.Base(composePath))
+		fmt.Fprintf(stdout, "\n%-16s %-10s %-8s %-6s %s\n", "SERVICE", "PRESET", "RUNTIME", "PORT", "DETECTED BY")
 		ignored := map[string]bool{}
 		for _, n := range cfg.Ignored {
 			ignored[n] = true
 		}
 		for _, r := range detect.All(f) {
 			if ignored[r.Service] {
-				fmt.Fprintf(stdout, "%-16s %-10s %-8s %-6s %s\n", r.Service, "-", "-", "-", "ignoré (observa.yaml : ignored)")
+				fmt.Fprintf(stdout, "%-16s %-10s %-8s %-6s %s\n", r.Service, "-", "-", "-", "ignored (observa.yaml: ignored)")
 				continue
 			}
 			if prev, ok := cfg.Services[r.Service]; ok {
-				fmt.Fprintf(stdout, "%-16s %-10s %-8s %-6d %s\n", r.Service, prev.Preset, prev.EffectiveRuntime(), prev.EffectivePort(), "observa.yaml existant (conservé)")
+				fmt.Fprintf(stdout, "%-16s %-10s %-8s %-6d %s\n", r.Service, prev.Preset, prev.EffectiveRuntime(), prev.EffectivePort(), "existing observa.yaml (kept)")
 				continue
 			}
 			fmt.Fprintf(stdout, "%-16s %-10s %-8s %-6d %s\n", r.Service, r.Preset, dash(r.Runtime), r.Port, strings.Join(r.Reasons, ", "))
@@ -113,8 +113,8 @@ func runInit(args []string) error {
 					continue
 				}
 				s := cfg.Services[name]
-				answer := ask(fmt.Sprintf("Preset pour %s (%s, ou « ignorer ») ?", name, strings.Join(presets.Names(), "/")), s.Preset, false)
-				if answer == "ignorer" || answer == "ignore" || answer == "-" {
+				answer := ask(fmt.Sprintf("Preset for %s (%s, or \"ignore\")?", name, strings.Join(presets.Names(), "/")), s.Preset, false)
+				if answer == "ignore" || answer == "-" {
 					delete(cfg.Services, name)
 					cfg.Ignored = append(cfg.Ignored, name)
 					continue
@@ -135,7 +135,7 @@ func runInit(args []string) error {
 		for _, sv := range services {
 			name, spec, okCut := strings.Cut(sv, "=")
 			if !okCut {
-				return usagef("--service attend nom=preset[:runtime] (ex. api=django)")
+				return usagef("--service expects name=preset[:runtime] (e.g. api=django)")
 			}
 			preset, rt, _ := strings.Cut(spec, ":")
 			s := cfg.Services[name]
@@ -146,7 +146,7 @@ func runInit(args []string) error {
 			s.Preset, s.Runtime = preset, rt
 		}
 		if len(cfg.Services) == 0 {
-			return usagef("mode docker : déclarez les services avec --service nom=preset (ex. --service api=django --service db=postgres)")
+			return usagef("docker mode: declare services with --service name=preset (e.g. --service api=django --service db=postgres)")
 		}
 		if errs := cfg.Validate(); len(errs) > 0 {
 			return project.ValidationError(errs)
@@ -154,7 +154,7 @@ func runInit(args []string) error {
 		plan := initgen.ForDockerRun(cfg)
 		return writeInit(dir, cfgPath, cfg, plan, existing, "")
 	default:
-		return usagef("--runtime : compose, docker ou auto")
+		return usagef("--runtime: compose, docker or auto")
 	}
 }
 
@@ -163,30 +163,30 @@ func writeInit(dir, cfgPath string, cfg *project.Config, plan *initgen.Plan, exi
 		return err
 	}
 	if existing {
-		ok("observa.yaml mis à jour")
+		ok("observa.yaml updated")
 	} else {
-		ok("observa.yaml créé")
+		ok("observa.yaml created")
 	}
 	written, err := plan.Write(dir)
 	if err != nil {
 		return err
 	}
 	for _, w := range written {
-		ok("%s généré", w)
+		ok("%s generated", w)
 	}
 	for _, n := range plan.Notes {
 		warn("%s", n)
 	}
 	fmt.Fprintln(stdout)
-	info("Étapes suivantes, sur le serveur où tourne le projet (agent installé) :")
-	info("  1. observa apply                      # enregistre seuils, routage et bases auprès de l'agent")
+	info("Next steps, on the server running the project (with the agent installed):")
+	info("  1. observa apply                      # registers thresholds, routing and databases with the agent")
 	if composeName != "" {
 		info("  2. %s up -d --build", composeName)
 	} else {
-		info("  2. relancez chaque conteneur avec la commande docker run indiquée ci-dessus")
+		info("  2. restart each container with the docker run command shown above")
 	}
-	info("  3. observa doctor                     # vérifie que les données arrivent")
-	info("Ajustez seuils et notifications dans observa.yaml (services.<nom>.alerts, notifications).")
+	info("  3. observa doctor                     # checks that data is arriving")
+	info("Tune thresholds and notifications in observa.yaml (services.<name>.alerts, notifications).")
 	return nil
 }
 
@@ -212,19 +212,19 @@ func runValidate(args []string) error {
 		if f, err := compose.Load(cp); err == nil {
 			for _, name := range cfg.ServiceNames() {
 				if _, ok := f.Services[name]; !ok && cfg.Services[name].Container == "" {
-					warn("services.%s absent de %s (lancé avec docker run ? précisez container:)", name, filepath.Base(cp))
+					warn("services.%s missing from %s (started with docker run? set container:)", name, filepath.Base(cp))
 				}
 			}
 		}
 	}
-	ok("%s valide : projet %s, env %s, %d service(s)", path, cfg.Project, cfg.Env, len(cfg.Services))
+	ok("%s valid: project %s, env %s, %d service(s)", path, cfg.Project, cfg.Env, len(cfg.Services))
 	return nil
 }
 
 func runApply(args []string) error {
-	fs := newFlags("observa apply", "observa apply [observa.yaml] [--agent-dir <dossier>] [--remove]")
+	fs := newFlags("observa apply", "observa apply [observa.yaml] [--agent-dir <directory>] [--remove]")
 	dir := agentDirFlag(fs, "agent-dir")
-	remove := fs.Bool("remove", false, "retirer ce projet de l'agent")
+	remove := fs.Bool("remove", false, "remove this project from the agent")
 	pos, err := parse(fs, args)
 	if err != nil {
 		return err
@@ -251,13 +251,13 @@ func runApply(args []string) error {
 		if err := reloadAgent(d); err != nil {
 			return err
 		}
-		ok("Projet %s/%s retiré de l'agent", cfg.Project, cfg.Env)
+		ok("Project %s/%s removed from the agent", cfg.Project, cfg.Env)
 		return nil
 	}
 	if err := d.SaveProject(cfg); err != nil {
 		return err
 	}
-	ok("Projet %s/%s enregistré auprès de l'agent (%s)", cfg.Project, cfg.Env, d.Path)
+	ok("Project %s/%s registered with the agent (%s)", cfg.Project, cfg.Env, d.Path)
 	for _, name := range cfg.ServiceNames() {
 		s := cfg.Services[name]
 		p, _ := presets.Get(s.Preset)
@@ -276,15 +276,15 @@ func runApply(args []string) error {
 		info("%-14s %-9s %-5s %s", name, s.Preset, s.EffectiveInstrumentation(), strings.Join(th, " "))
 	}
 	if len(cfg.Notifications.Critical)+len(cfg.Notifications.Warning) > 0 {
-		info("Notifications : critique → %s · avertissement → %s (canaux à définir dans central.yaml)",
+		info("Notifications: critical → %s · warning → %s (channels defined in central.yaml)",
 			dash(strings.Join(cfg.Notifications.Critical, ",")), dash(strings.Join(cfg.Notifications.Warning, ",")))
 	}
-	info("(* = seuil personnalisé ; les autres valeurs sont les défauts des presets)")
+	info("(* = custom threshold; other values are preset defaults)")
 	if err := reloadAgent(d); err != nil {
 		return err
 	}
 	if out, err := dockerx.Output("ps", "--filter", "label=observa.project="+cfg.Project, "--filter", "label=observa.env="+cfg.Env, "--format", "{{.Names}}"); err == nil && strings.TrimSpace(out) == "" {
-		warn("Aucun conteneur de %s/%s ne tourne encore avec les labels observa : démarrez-le avec l'override généré par observa init.", cfg.Project, cfg.Env)
+		warn("No container of %s/%s is running with observa labels yet: start it with the override generated by observa init.", cfg.Project, cfg.Env)
 	}
 	return nil
 }
@@ -299,11 +299,11 @@ func runPresetList(args []string) error {
 
 func runPresetShow(args []string) error {
 	if len(args) != 1 {
-		return usagef("observa preset show <nom> (%s)", strings.Join(presets.Names(), ", "))
+		return usagef("observa preset show <name> (%s)", strings.Join(presets.Names(), ", "))
 	}
 	p, ok := presets.Get(args[0])
 	if !ok {
-		return usagef("preset %q inconnu (%s)", args[0], strings.Join(presets.Names(), ", "))
+		return usagef("unknown preset %q (%s)", args[0], strings.Join(presets.Names(), ", "))
 	}
 	fmt.Fprint(stdout, p.Describe())
 	return nil
@@ -327,7 +327,7 @@ func slugify(s string) string {
 		s = strings.Trim(s[:40], "-")
 	}
 	if s == "" {
-		return "mon-projet"
+		return "my-project"
 	}
 	return s
 }

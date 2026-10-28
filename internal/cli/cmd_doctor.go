@@ -23,10 +23,10 @@ type doctorReport struct{ problems int }
 func (r *doctorReport) bad(format string, a ...any) { r.problems++; fail(format, a...) }
 
 func runDoctor(args []string) error {
-	fs := newFlags("observa doctor", "observa doctor [--agent-dir <dossier>] [--central-dir <dossier>] [--project-dir <dossier>]")
+	fs := newFlags("observa doctor", "observa doctor [--agent-dir <directory>] [--central-dir <directory>] [--project-dir <directory>]")
 	agentDir := agentDirFlag(fs, "agent-dir")
-	centralDir := fs.String("central-dir", defaultCentralDir(), "dossier du central")
-	projectDir := fs.String("project-dir", ".", "dossier du projet (observa.yaml)")
+	centralDir := fs.String("central-dir", defaultCentralDir(), "central directory")
+	projectDir := fs.String("project-dir", ".", "project directory (observa.yaml)")
 	if _, err := parse(fs, args); err != nil {
 		return err
 	}
@@ -35,11 +35,11 @@ func runDoctor(args []string) error {
 	fmt.Fprintln(stdout, "Docker")
 	if err := dockerx.Available(); err != nil {
 		r.bad("%v", err)
-		return fmt.Errorf("diagnostic interrompu")
+		return fmt.Errorf("diagnosis aborted")
 	}
-	ok("Docker et docker compose disponibles")
+	ok("Docker and docker compose available")
 	if dockerx.IsDesktop() {
-		warn("Docker Desktop : les métriques de l'hôte sont celles de la VM Docker ; eBPF non garanti.")
+		warn("Docker Desktop: host metrics come from the Docker VM; eBPF not guaranteed.")
 	}
 
 	ad := agent.Dir{Path: *agentDir}
@@ -47,7 +47,7 @@ func runDoctor(args []string) error {
 		fmt.Fprintln(stdout, "\nAgent ("+ad.Path+")")
 		doctorAgent(r, ad, s)
 	} else {
-		info("\nPas d'agent dans %s (normal sur un serveur central seul).", ad.Path)
+		info("\nNo agent in %s (expected on a central-only server).", ad.Path)
 	}
 
 	cd := central.Dir{Path: *centralDir}
@@ -58,15 +58,15 @@ func runDoctor(args []string) error {
 
 	pf := filepath.Join(*projectDir, project.FileName)
 	if fileExists(pf) {
-		fmt.Fprintln(stdout, "\nProjet ("+pf+")")
+		fmt.Fprintln(stdout, "\nProject ("+pf+")")
 		doctorProject(r, pf, ad)
 	}
 
 	fmt.Fprintln(stdout)
 	if r.problems > 0 {
-		return fmt.Errorf("%d problème(s) détecté(s)", r.problems)
+		return fmt.Errorf("%d problem(s) found", r.problems)
 	}
-	ok("Aucun problème détecté")
+	ok("No problems found")
 	return nil
 }
 
@@ -79,16 +79,16 @@ func envOr(k, def string) string {
 
 func doctorAgent(r *doctorReport, ad agent.Dir, s *agent.Settings) {
 	if agentRunning() {
-		ok("observa-agent en marche (agent %s, serveur %s)", s.Name, s.Host)
+		ok("observa-agent is running (agent %s, server %s)", s.Name, s.Host)
 	} else {
-		r.bad("observa-agent arrêté : docker compose --project-directory %s up -d", ad.Path)
+		r.bad("observa-agent is stopped: docker compose --project-directory %s up -d", ad.Path)
 	}
 	if _, err := dockerx.Output("network", "inspect", instrument.NetworkName); err != nil {
-		r.bad("réseau Docker %s absent : docker network create %s", instrument.NetworkName, instrument.NetworkName)
+		r.bad("Docker network %s missing: docker network create %s", instrument.NetworkName, instrument.NetworkName)
 	}
 	env, _ := ad.Env()
 	if env["OBSERVA_TOKEN"] == "" {
-		r.bad("OBSERVA_TOKEN absent de %s/.env : réinstallez l'agent avec --token", ad.Path)
+		r.bad("OBSERVA_TOKEN missing from %s/.env: reinstall the agent with --token", ad.Path)
 	} else {
 		ping := s.CentralURL
 		if u, err := url.Parse(s.CentralURL); err == nil && u.Hostname() == "observa-caddy" {
@@ -100,12 +100,12 @@ func doctorAgent(r *doctorReport, ad agent.Dir, s *agent.Settings) {
 		if err := pingCentral(ping, s.Name, env["OBSERVA_TOKEN"], s.TLS, ad.CAPath()); err != nil {
 			r.bad("%v", err)
 		} else {
-			ok("Central joignable et token accepté (%s)", s.CentralURL)
+			ok("Central reachable and token accepted (%s)", s.CentralURL)
 		}
 	}
 	if s.EBPF {
 		if out, err := dockerx.Output("info", "--format", "{{.KernelVersion}}"); err == nil {
-			info("eBPF activé, noyau %s (5.8+ requis)", strings.TrimSpace(out))
+			info("eBPF enabled, kernel %s (5.8+ required)", strings.TrimSpace(out))
 		}
 	}
 	// Errors reported by Alloy itself.
@@ -117,7 +117,7 @@ func doctorAgent(r *doctorReport, ad agent.Dir, s *agent.Settings) {
 			}
 		}
 		if len(errs) > 0 {
-			warn("%d erreur(s) dans les logs de l'agent (10 dernières minutes), dernière :", len(errs))
+			warn("%d error(s) in the agent logs (last 10 minutes), latest:", len(errs))
 			info("%s", truncate(errs[len(errs)-1], 300))
 		}
 	}
@@ -126,14 +126,14 @@ func doctorAgent(r *doctorReport, ad agent.Dir, s *agent.Settings) {
 	if err == nil {
 		names := strings.Fields(out)
 		if len(names) == 0 {
-			warn("Aucun conteneur avec le label observa.enable=true sur ce serveur")
+			warn("No containers labeled observa.enable=true on this server")
 		} else {
-			ok("%d conteneur(s) surveillé(s) : %s", len(names), strings.Join(names, ", "))
+			ok("%d monitored container(s): %s", len(names), strings.Join(names, ", "))
 		}
 		for _, n := range names {
 			nets, err := dockerx.Output("inspect", "-f", "{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}", n)
 			if err == nil && !strings.Contains(" "+nets+" ", " "+instrument.NetworkName+" ") {
-				warn("%s n'est pas sur le réseau %s : traces et métriques OpenTelemetry n'arriveront pas (relancez avec l'override)", n, instrument.NetworkName)
+				warn("%s is not on the %s network: OpenTelemetry traces and metrics will not arrive (restart it with the override)", n, instrument.NetworkName)
 			}
 		}
 	}
@@ -146,7 +146,7 @@ func doctorAgent(r *doctorReport, ad agent.Dir, s *agent.Settings) {
 		for _, name := range c.ServiceNames() {
 			p, _ := presets.Get(c.Services[name].Preset)
 			if p.Exporter == presets.ExporterPostgres && env[c.EffectiveSecretEnv(name)] == "" {
-				r.bad("%s/%s/%s : %s absent du .env de l'agent (observa agent env set %s=...)", c.Project, c.Env, name, c.EffectiveSecretEnv(name), c.EffectiveSecretEnv(name))
+				r.bad("%s/%s/%s: %s missing from the agent .env (observa agent env set %s=...)", c.Project, c.Env, name, c.EffectiveSecretEnv(name), c.EffectiveSecretEnv(name))
 			}
 		}
 	}
@@ -160,7 +160,7 @@ func doctorCentral(r *doctorReport, cd central.Dir) {
 	}
 	out, err := dockerx.ComposeOutput(cd.Path, "ps", "--format", "{{.Service}}|{{.State}}|{{.Health}}")
 	if err != nil {
-		r.bad("docker compose ps : %v", err)
+		r.bad("docker compose ps: %v", err)
 		return
 	}
 	before := r.problems
@@ -173,39 +173,39 @@ func doctorCentral(r *doctorReport, cd central.Dir) {
 		seen[f[0]] = true
 		switch {
 		case f[1] != "running":
-			r.bad("%s : %s", f[0], f[1])
+			r.bad("%s: %s", f[0], f[1])
 		case len(f) > 2 && f[2] == "unhealthy":
-			r.bad("%s : en marche mais unhealthy (docker compose logs %s)", f[0], f[0])
+			r.bad("%s: running but unhealthy (docker compose logs %s)", f[0], f[0])
 		}
 	}
 	for _, c := range []string{"caddy", "grafana", "prometheus", "alertmanager", "loki", "tempo"} {
 		if !seen[c] {
-			r.bad("%s absent : docker compose --project-directory %s up -d", c, cd.Path)
+			r.bad("%s missing: docker compose --project-directory %s up -d", c, cd.Path)
 		}
 	}
 	if r.problems == before {
-		ok("Tous les composants tournent (%s)", s.BaseURL())
+		ok("All components running (%s)", s.BaseURL())
 	}
 	if _, err := dockerx.ComposeOutput(cd.Path, "exec", "-T", "prometheus", "promtool", "check", "rules", "/etc/prometheus/rules/observa.yml"); err != nil {
-		r.bad("règles Prometheus invalides : %v", err)
+		r.bad("invalid Prometheus rules: %v", err)
 	} else {
-		ok("Règles d'alerte valides (promtool)")
+		ok("Alert rules valid (promtool)")
 	}
 	if _, err := dockerx.ComposeOutput(cd.Path, "exec", "-T", "alertmanager", "amtool", "check-config", "/etc/alertmanager/alertmanager.yml"); err != nil {
-		r.bad("configuration Alertmanager invalide : %v", err)
+		r.bad("invalid Alertmanager configuration: %v", err)
 	} else {
-		ok("Configuration Alertmanager valide (amtool)")
+		ok("Alertmanager configuration valid (amtool)")
 	}
 	if len(s.Notifications.Default) == 0 {
-		warn("Aucun canal de notification par défaut : éditez %s/central.yaml (notifications) puis observa central reload", cd.Path)
+		warn("No default notification channel: edit %s/central.yaml (notifications), then run observa central reload", cd.Path)
 	}
 	// What the central receives.
 	hosts, err := promQuery(cd, `count by (host) (node_boot_time_seconds{job="observa/host"})`)
 	if err == nil {
 		if len(hosts) == 0 {
-			warn("Aucun agent ne remonte de données")
+			warn("No agent is sending data")
 		} else {
-			ok("Agents qui envoient des données : %s", strings.Join(sortedLabels(hosts, "host"), ", "))
+			ok("Agents sending data: %s", strings.Join(sortedLabels(hosts, "host"), ", "))
 		}
 	}
 	svcs, err := promQuery(cd, `count by (project, env) (observa:service:present)`)
@@ -215,10 +215,10 @@ func doctorCentral(r *doctorReport, cd central.Dir) {
 			l = append(l, m["project"]+"/"+m["env"])
 		}
 		sort.Strings(l)
-		ok("Projets visibles : %s", strings.Join(l, ", "))
+		ok("Visible projects: %s", strings.Join(l, ", "))
 	}
 	if traces, err := promQuery(cd, `count by (service) (traces_spanmetrics_calls_total)`); err == nil && len(traces) > 0 {
-		ok("Services avec des traces : %s", strings.Join(sortedLabels(traces, "service"), ", "))
+		ok("Services with traces: %s", strings.Join(sortedLabels(traces, "service"), ", "))
 	}
 }
 
@@ -228,9 +228,9 @@ func doctorProject(r *doctorReport, path string, ad agent.Dir) {
 		r.bad("%v", err)
 		return
 	}
-	ok("observa.yaml valide (%s/%s, %d services)", cfg.Project, cfg.Env, len(cfg.Services))
+	ok("observa.yaml valid (%s/%s, %d services)", cfg.Project, cfg.Env, len(cfg.Services))
 	if _, err := ad.Settings(); err == nil && !fileExists(ad.ProjectFile(cfg.Project, cfg.Env)) {
-		warn("projet non appliqué sur l'agent de ce serveur : observa apply")
+		warn("project not applied on this server's agent: observa apply")
 	}
 	out, err := dockerx.Output("ps", "--filter", "label=observa.project="+cfg.Project, "--filter", "label=observa.env="+cfg.Env, "--format", `{{.Label "observa.service"}}`)
 	if err != nil {
@@ -245,7 +245,7 @@ func doctorProject(r *doctorReport, path string, ad agent.Dir) {
 			continue
 		}
 		if !running[name] {
-			warn("%s : aucun conteneur en marche avec les labels observa (lancé avec l'override ?)", name)
+			warn("%s: no running container with observa labels (started with the override?)", name)
 		}
 	}
 }
@@ -269,7 +269,7 @@ func promQuery(cd central.Dir, q string) ([]map[string]string, error) {
 		return nil, err
 	}
 	if resp.Status != "success" {
-		return nil, errors.New("requête Prometheus en échec")
+		return nil, errors.New("Prometheus query failed")
 	}
 	var res []map[string]string
 	for _, r := range resp.Data.Result {
@@ -299,12 +299,12 @@ func truncate(s string, n int) string {
 func runAlertTest(args []string) error {
 	fs := newFlags("observa alert test", "observa alert test [--severity critical|warning] [--project p --env e --service s] [--dir <central>]")
 	dir := centralDirFlag(fs)
-	sev := fs.String("severity", "critical", "sévérité de l'alerte de test")
-	projectName := fs.String("project", "test", "projet (pour tester le routage d'un projet)")
-	env := fs.String("env", "test", "environnement")
+	sev := fs.String("severity", "critical", "test alert severity")
+	projectName := fs.String("project", "test", "project (to test a project's routing)")
+	env := fs.String("env", "test", "environment")
 	service := fs.String("service", "test", "service")
-	notifyCritical := fs.String("notify-critical", "", "canaux critiques à simuler (sinon : canaux par défaut)")
-	notifyWarning := fs.String("notify-warning", "", "canaux avertissement à simuler")
+	notifyCritical := fs.String("notify-critical", "", "critical channels to simulate (default: the default channels)")
+	notifyWarning := fs.String("notify-warning", "", "warning channels to simulate")
 	if _, err := parse(fs, args); err != nil {
 		return err
 	}
@@ -325,16 +325,16 @@ func runAlertTest(args []string) error {
 	}
 	cmd := append([]string{"exec", "-T", "alertmanager", "amtool", "--alertmanager.url=http://localhost:9093", "alert", "add"}, labels...)
 	cmd = append(cmd,
-		"--annotation=summary=Alerte de test ObservaBoard ("+*sev+")",
-		"--annotation=description=Envoyée par observa alert test : si vous la recevez, les notifications fonctionnent.",
+		"--annotation=summary=ObservaBoard test alert ("+*sev+")",
+		"--annotation=description=Sent by observa alert test: if you receive it, notifications work.",
 		"--annotation=runbook_url="+s.BaseURL()+"/runbooks/",
 		"--annotation=dashboard_url="+s.BaseURL()+"/d/observa-overview",
 	)
 	if err := dockerx.Compose(cd.Path, cmd...); err != nil {
 		return err
 	}
-	ok("Alerte de test envoyée à Alertmanager (elle se résout seule après 5 minutes)")
-	info("Routage : %s", map[bool]string{true: "canaux simulés", false: "canaux par défaut de central.yaml"}[*notifyCritical != "" || *notifyWarning != ""])
-	info("Délai d'envoi : environ 30 secondes (group_wait).")
+	ok("Test alert sent to Alertmanager (it resolves itself after 5 minutes)")
+	info("Routing: %s", map[bool]string{true: "simulated channels", false: "default channels from central.yaml"}[*notifyCritical != "" || *notifyWarning != ""])
+	info("Delivery delay: about 30 seconds (group_wait).")
 	return nil
 }

@@ -26,7 +26,7 @@ import (
 func agentDirFlag(fs interface {
 	String(name, value, usage string) *string
 }, name string) *string {
-	return fs.String(name, defaultAgentDir(), "dossier de l'agent (variable OBSERVA_AGENT_DIR)")
+	return fs.String(name, defaultAgentDir(), "agent directory (env OBSERVA_AGENT_DIR)")
 }
 
 // defaultAgentDir: OBSERVA_AGENT_DIR, else the server install, else the
@@ -55,14 +55,14 @@ func runAgentInstall(args []string) error {
 	fs := newFlags("observa agent install", "observa agent install --central <url> --token <agent>.<secret> [options]")
 	var o agentInstallOpts
 	dir := agentDirFlag(fs, "dir")
-	fs.StringVar(&o.centralURL, "central", "", "URL du central (ex. https://observa.example.com)")
-	fs.StringVar(&o.token, "token", "", "token de l'agent, créé sur le central avec observa token create (évite l'historique du shell : --token-file ou OBSERVA_AGENT_TOKEN)")
-	tokenFile := fs.String("token-file", "", "fichier contenant le token (- pour l'entrée standard)")
-	fs.StringVar(&o.host, "host", defaultAgentName(), "nom du serveur dans les dashboards (label host)")
-	fs.StringVar(&o.caFile, "ca-file", "", "certificat de l'autorité du central (mode --ip : observa central ca)")
-	fs.BoolVar(&o.insecure, "insecure-skip-verify", false, "ne pas vérifier le certificat du central (déconseillé)")
-	fs.BoolVar(&o.ebpf, "ebpf", false, "activer l'instrumentation eBPF (Linux 5.8+, conteneur privilégié avec accès aux processus de l'hôte)")
-	fs.BoolVar(&o.noStart, "no-start", false, "générer les fichiers sans démarrer l'agent")
+	fs.StringVar(&o.centralURL, "central", "", "central URL (e.g. https://observa.example.com)")
+	fs.StringVar(&o.token, "token", "", "agent token, created on the central with observa token create (to keep it out of shell history: --token-file or OBSERVA_AGENT_TOKEN)")
+	tokenFile := fs.String("token-file", "", "file containing the token (- for stdin)")
+	fs.StringVar(&o.host, "host", defaultAgentName(), "server name in dashboards (host label)")
+	fs.StringVar(&o.caFile, "ca-file", "", "central CA certificate (--ip mode: observa central ca)")
+	fs.BoolVar(&o.insecure, "insecure-skip-verify", false, "skip verification of the central certificate (not recommended)")
+	fs.BoolVar(&o.ebpf, "ebpf", false, "enable eBPF instrumentation (Linux 5.8+, privileged container with access to host processes)")
+	fs.BoolVar(&o.noStart, "no-start", false, "generate files without starting the agent")
 	if _, err := parse(fs, args); err != nil {
 		return err
 	}
@@ -93,7 +93,7 @@ func runAgentInstall(args []string) error {
 	}
 	if o.centralURL == "" || o.token == "" {
 		fs.Usage()
-		return usagef("--central et --token sont requis")
+		return usagef("--central and --token are required")
 	}
 	return installAgent(o)
 }
@@ -105,13 +105,13 @@ func installAgent(o agentInstallOpts) error {
 	}
 	u, err := url.Parse(strings.TrimRight(o.centralURL, "/"))
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" {
-		return usagef("--central doit être une URL http(s) complète (ex. https://observa.example.com)")
+		return usagef("--central must be a full http(s) URL (e.g. https://observa.example.com)")
 	}
 	if u.Scheme == "http" && o.pingURL == "" {
-		warn("le central est en HTTP : le token circule en clair. À réserver à un réseau privé.")
+		warn("the central uses plain HTTP: the token is sent unencrypted. Use only on a private network.")
 	}
 	if !project.SlugRE.MatchString(o.host) {
-		return usagef("--host %q invalide (minuscules, chiffres, tirets)", o.host)
+		return usagef("invalid --host %q (lowercase letters, digits, hyphens)", o.host)
 	}
 	if err := requireWritable(o.dir); err != nil {
 		return err
@@ -147,9 +147,9 @@ func installAgent(o agentInstallOpts) error {
 	}
 	s.Desktop = dockerx.IsDesktop()
 	if s.Desktop {
-		warn("Docker Desktop détecté : métriques de l'hôte limitées à la VM Docker.")
+		warn("Docker Desktop detected: host metrics are limited to the Docker VM.")
 		if s.EBPF {
-			warn("eBPF sous Docker Desktop : dépend du noyau de la VM, non garanti (observa doctor le vérifie).")
+			warn("eBPF on Docker Desktop depends on the VM kernel and is not guaranteed (observa doctor checks it).")
 		}
 	}
 
@@ -157,14 +157,14 @@ func installAgent(o agentInstallOpts) error {
 	if pingURL == "" {
 		pingURL = s.CentralURL
 	}
-	step("Vérification du token auprès du central")
+	step("Checking the token with the central")
 	if dockerx.DryRun {
-		info("[dry-run] vérification ignorée")
+		info("[dry-run] check skipped")
 	} else if err := pingCentral(pingURL, name, secret, s.TLS, d.CAPath()); err != nil {
 		warn("%v", err)
-		warn("L'installation continue ; l'agent réessaiera tout seul. Vérifiez ensuite avec observa doctor.")
+		warn("Continuing the install; the agent will retry on its own. Check afterwards with observa doctor.")
 	} else {
-		ok("Token accepté par le central")
+		ok("Token accepted by the central")
 	}
 
 	if err := d.SaveSettings(s); err != nil {
@@ -180,7 +180,7 @@ func installAgent(o agentInstallOpts) error {
 	for _, w := range warns {
 		warn("%s", w)
 	}
-	ok("Configuration de l'agent générée dans %s", o.dir)
+	ok("Agent configuration generated in %s", o.dir)
 	if o.noStart {
 		return nil
 	}
@@ -190,9 +190,9 @@ func installAgent(o agentInstallOpts) error {
 	if err := dockerx.Compose(o.dir, "up", "-d", "--remove-orphans"); err != nil {
 		return err
 	}
-	ok("Agent %s démarré (serveur %s)", name, s.Host)
-	info("Les conteneurs portant le label observa.enable=true sont surveillés automatiquement.")
-	info("Dans un projet : observa init, puis observa apply sur ce serveur.")
+	ok("Agent %s started (server %s)", name, s.Host)
+	info("Containers labeled observa.enable=true are monitored automatically.")
+	info("In a project: observa init, then observa apply on this server.")
 	return nil
 }
 
@@ -211,7 +211,7 @@ func pingCentral(base, user, secret string, t agent.TLS, caPath string) error {
 		}
 		pool := x509.NewCertPool()
 		if !pool.AppendCertsFromPEM(pem) {
-			return errors.New("ca-file : aucun certificat PEM lisible")
+			return errors.New("ca-file: no readable PEM certificate")
 		}
 		tlsCfg.RootCAs = pool
 	}
@@ -225,18 +225,18 @@ func pingCentral(base, user, secret string, t agent.TLS, caPath string) error {
 	if err != nil {
 		var cerr *tls.CertificateVerificationError
 		if errors.As(err, &cerr) {
-			return fmt.Errorf("certificat du central non reconnu : utilisez --ca-file (mode --ip) : %v", err)
+			return fmt.Errorf("central certificate not trusted: use --ca-file (--ip mode): %v", err)
 		}
-		return fmt.Errorf("central injoignable (%s) : %v", base, err)
+		return fmt.Errorf("central unreachable (%s): %v", base, err)
 	}
 	defer resp.Body.Close()
 	switch resp.StatusCode {
 	case http.StatusOK:
 		return nil
 	case http.StatusUnauthorized:
-		return errors.New("token refusé par le central (401) : vérifiez-le ou créez-en un : observa token create <agent>")
+		return errors.New("token rejected by the central (401): check it or create a new one: observa token create <agent>")
 	default:
-		return fmt.Errorf("réponse inattendue du central : %s", resp.Status)
+		return fmt.Errorf("unexpected response from the central: %s", resp.Status)
 	}
 }
 
@@ -254,7 +254,7 @@ func reloadAgent(d agent.Dir) error {
 		warn("%s", w)
 	}
 	if !agentRunning() {
-		warn("L'agent n'est pas démarré : docker compose --project-directory %s up -d", d.Path)
+		warn("The agent is not running: docker compose --project-directory %s up -d", d.Path)
 		return nil
 	}
 	// compose changes (eBPF toggled...) need a recreate; config changes a SIGHUP.
@@ -265,9 +265,9 @@ func reloadAgent(d agent.Dir) error {
 		if err := dockerx.Run("kill", "--signal=HUP", "observa-agent"); err != nil {
 			return err
 		}
-		ok("Configuration de l'agent rechargée")
+		ok("Agent configuration reloaded")
 	} else {
-		ok("Configuration de l'agent inchangée")
+		ok("Agent configuration unchanged")
 	}
 	return nil
 }
@@ -281,7 +281,7 @@ func agentRunning() bool {
 }
 
 func runAgentReload(args []string) error {
-	fs := newFlags("observa agent reload", "observa agent reload [--dir <dossier>]")
+	fs := newFlags("observa agent reload", "observa agent reload [--dir <directory>]")
 	dir := agentDirFlag(fs, "dir")
 	if _, err := parse(fs, args); err != nil {
 		return err
@@ -290,7 +290,7 @@ func runAgentReload(args []string) error {
 }
 
 func runAgentStatus(args []string) error {
-	fs := newFlags("observa agent status", "observa agent status [--dir <dossier>]")
+	fs := newFlags("observa agent status", "observa agent status [--dir <directory>]")
 	dir := agentDirFlag(fs, "dir")
 	if _, err := parse(fs, args); err != nil {
 		return err
@@ -300,11 +300,11 @@ func runAgentStatus(args []string) error {
 	if err != nil {
 		return err
 	}
-	info("Agent %s · serveur %s · central %s", s.Name, s.Host, s.CentralURL)
+	info("Agent %s · server %s · central %s", s.Name, s.Host, s.CentralURL)
 	if agentRunning() {
-		ok("Conteneur observa-agent en marche")
+		ok("Container observa-agent is running")
 	} else {
-		fail("Conteneur observa-agent arrêté : docker compose --project-directory %s up -d", d.Path)
+		fail("Container observa-agent is stopped: docker compose --project-directory %s up -d", d.Path)
 	}
 	return printDiscovered(d)
 }
@@ -319,10 +319,10 @@ func printDiscovered(d agent.Dir) error {
 	rules, _ := d.AttachRules()
 	lines := strings.Split(strings.TrimSpace(out), "\n")
 	if strings.TrimSpace(out) == "" && len(rules) == 0 {
-		info("Aucun conteneur surveillé : ajoutez le label observa.enable=true (observa init) ou utilisez observa attach.")
+		info("No monitored containers: add the observa.enable=true label (observa init) or use observa attach.")
 		return nil
 	}
-	fmt.Fprintf(stdout, "\n%-32s %-14s %-10s %-14s %-9s %s\n", "CONTENEUR", "PROJET", "ENV", "SERVICE", "PRESET", "ÉTAT")
+	fmt.Fprintf(stdout, "\n%-32s %-14s %-10s %-14s %-9s %s\n", "CONTAINER", "PROJECT", "ENV", "SERVICE", "PRESET", "STATUS")
 	for _, l := range lines {
 		if l == "" {
 			continue
@@ -343,7 +343,7 @@ func printDiscovered(d agent.Dir) error {
 }
 
 func runAgentEnv(args []string) error {
-	fs := newFlags("observa agent env", "observa agent env set NOM=valeur [NOM=valeur...] | observa agent env list")
+	fs := newFlags("observa agent env", "observa agent env set NAME=value [NAME=value...] | observa agent env list")
 	dir := agentDirFlag(fs, "dir")
 	pos, err := parse(fs, args)
 	if err != nil {
@@ -351,7 +351,7 @@ func runAgentEnv(args []string) error {
 	}
 	d := agent.Dir{Path: *dir}
 	if len(pos) == 0 {
-		return usagef("observa agent env set NOM=valeur | observa agent env list")
+		return usagef("observa agent env set NAME=value | observa agent env list")
 	}
 	switch pos[0] {
 	case "list":
@@ -368,41 +368,41 @@ func runAgentEnv(args []string) error {
 		for _, a := range pos[1:] {
 			k, v, ok := strings.Cut(a, "=")
 			if !ok {
-				return usagef("format attendu NOM=valeur : %q", a)
+				return usagef("expected NAME=value: %q", a)
 			}
 			if k == "OBSERVA_TOKEN" {
-				return usagef("le token se change en réinstallant l'agent (observa agent install --token ...)")
+				return usagef("to change the token, reinstall the agent (observa agent install --token ...)")
 			}
 			kv[k] = v
 		}
 		if len(kv) == 0 {
-			return usagef("rien à définir")
+			return usagef("nothing to set")
 		}
 		if err := d.SetEnv(kv); err != nil {
 			return err
 		}
-		ok("%d variable(s) enregistrée(s) dans %s/.env", len(kv), d.Path)
+		ok("%d variable(s) saved to %s/.env", len(kv), d.Path)
 		return renderAndRecreate(d)
 	default:
-		return usagef("sous-commande inconnue %q (set, list)", pos[0])
+		return usagef("unknown subcommand %q (set, list)", pos[0])
 	}
 }
 
 // --- attach / detach ---
 
 func runAttach(args []string) error {
-	fs := newFlags("observa attach", "observa attach <conteneur> --project <p> --env <e> --preset <preset> [--service <nom>]")
+	fs := newFlags("observa attach", "observa attach <container> --project <p> --env <e> --preset <preset> [--service <name>]")
 	dir := agentDirFlag(fs, "agent-dir")
-	projectName := fs.String("project", "", "projet")
-	env := fs.String("env", "prod", "environnement")
-	service := fs.String("service", "", "nom du service (défaut : nom du conteneur)")
+	projectName := fs.String("project", "", "project")
+	env := fs.String("env", "prod", "environment")
+	service := fs.String("service", "", "service name (default: container name)")
 	preset := fs.String("preset", "generic", "preset ("+strings.Join(presets.Names(), ", ")+")")
 	pos, err := parse(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(pos) != 1 {
-		return usagef("précisez le conteneur : observa attach <conteneur> --project <p> --preset <preset>")
+		return usagef("specify the container: observa attach <container> --project <p> --preset <preset>")
 	}
 	container := strings.TrimPrefix(pos[0], "/")
 	if *service == "" {
@@ -410,18 +410,18 @@ func runAttach(args []string) error {
 	}
 	for _, v := range []string{*projectName, *env, *service} {
 		if !project.SlugRE.MatchString(v) {
-			return usagef("projet, env et service : minuscules, chiffres et tirets (%q)", v)
+			return usagef("project, env and service: lowercase letters, digits and hyphens (%q)", v)
 		}
 	}
 	if _, ok := presets.Get(*preset); !ok {
-		return usagef("preset %q inconnu (%s)", *preset, strings.Join(presets.Names(), ", "))
+		return usagef("unknown preset %q (%s)", *preset, strings.Join(presets.Names(), ", "))
 	}
 	d := agent.Dir{Path: *dir}
 	if _, err := d.Settings(); err != nil {
 		return err
 	}
 	if _, err := dockerx.Output("inspect", container); err != nil && !dockerx.DryRun {
-		return fmt.Errorf("conteneur %s introuvable : %v", container, err)
+		return fmt.Errorf("container %s not found: %v", container, err)
 	}
 	rules, err := d.AttachRules()
 	if err != nil {
@@ -440,25 +440,25 @@ func runAttach(args []string) error {
 	// Join the shared network so exporters and OTLP work, without restarting.
 	alias := project.Alias(*projectName, *env, *service)
 	if err := dockerx.Run("network", "connect", "--alias", alias, instrument.NetworkName, container); err != nil {
-		warn("réseau %s : %v (déjà connecté ?)", instrument.NetworkName, err)
+		warn("network %s: %v (already connected?)", instrument.NetworkName, err)
 	}
 	if err := reloadAgent(d); err != nil {
 		return err
 	}
-	ok("%s surveillé comme %s/%s/%s (preset %s), sans redémarrage", container, *projectName, *env, *service, *preset)
-	info("Logs et ressources : immédiat. Traces détaillées : observa init --runtime docker, puis relancer le conteneur.")
+	ok("%s monitored as %s/%s/%s (preset %s), without restart", container, *projectName, *env, *service, *preset)
+	info("Logs and resources: immediately. Detailed traces: observa init --runtime docker, then restart the container.")
 	return nil
 }
 
 func runDetach(args []string) error {
-	fs := newFlags("observa detach", "observa detach <conteneur>")
+	fs := newFlags("observa detach", "observa detach <container>")
 	dir := agentDirFlag(fs, "agent-dir")
 	pos, err := parse(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(pos) != 1 {
-		return usagef("précisez le conteneur : observa detach <conteneur>")
+		return usagef("specify the container: observa detach <container>")
 	}
 	d := agent.Dir{Path: *dir}
 	rules, err := d.AttachRules()
@@ -476,7 +476,7 @@ func runDetach(args []string) error {
 		kept = append(kept, r)
 	}
 	if !found {
-		return fmt.Errorf("aucune règle attach pour %s", pos[0])
+		return fmt.Errorf("no attach rule for %s", pos[0])
 	}
 	if err := d.SaveAttachRules(kept); err != nil {
 		return err
@@ -484,7 +484,7 @@ func runDetach(args []string) error {
 	if err := reloadAgent(d); err != nil {
 		return err
 	}
-	ok("%s n'est plus surveillé", pos[0])
+	ok("%s is no longer monitored", pos[0])
 	return nil
 }
 
@@ -508,6 +508,6 @@ func renderAndRecreate(d agent.Dir) error {
 	if err := dockerx.Compose(d.Path, "up", "-d", "--force-recreate"); err != nil {
 		return err
 	}
-	ok("Agent redémarré avec la nouvelle configuration")
+	ok("Agent restarted with the new configuration")
 	return nil
 }

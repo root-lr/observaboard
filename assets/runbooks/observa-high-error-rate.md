@@ -1,60 +1,60 @@
-# ObservaHighErrorRate — trop de réponses 5xx
+# ObservaHighErrorRate — too many 5xx responses
 
-**Sévérité :** critique · **Déclenchement :** part de réponses 5xx au-dessus du seuil pendant 5 minutes, avec au moins 3 requêtes par minute.
-**Seuil :** 5 % par défaut, modifiable par service avec `alerts.error_rate_pct` dans `observa.yaml`.
+**Severity:** critical · **Fires when:** the share of 5xx responses stays above the threshold for 5 minutes, with at least 3 requests per minute.
+**Threshold:** 5% by default, configurable per service with `alerts.error_rate_pct` in `observa.yaml`.
 
-## Ce que signifie l'alerte
+## What the alert means
 
-Le service répond à une part anormale de requêtes par une erreur serveur (500, 502, 503, 504…). Les erreurs 4xx (requêtes invalides, 404) ne comptent pas.
+The service answers an abnormal share of requests with a server error (500, 502, 503, 504…). 4xx errors (invalid requests, 404) do not count.
 
-## Impact pour les utilisateurs
+## User impact
 
-Des pages ou des appels d'API échouent. Selon les routes touchées, cela peut aller d'une fonctionnalité secondaire à un service entièrement inutilisable.
+Pages or API calls fail. Depending on the affected routes, this ranges from a minor feature to a completely unusable service.
 
-## Dashboards à ouvrir
+## Dashboards to open
 
-1. **Service HTTP** (lien `dashboard_url` de la notification) : rangées *Trafic* et *Routes* pour voir quelles routes échouent et depuis quand.
-2. **Traces → Requêtes en erreur** dans le même dashboard : ouvrez une trace pour voir l'étape qui échoue (requête SQL, appel externe, exception).
-3. **Logs du service** en bas du dashboard : cherchez la pile d'appels (traceback).
+1. **HTTP service** (the `dashboard_url` link in the notification): *Traffic* and *Routes* rows to see which routes fail and since when.
+2. **Traces → Failed requests** in the same dashboard: open a trace to see the failing step (SQL query, external call, exception).
+3. **Service logs** at the bottom of the dashboard: look for the stack trace (traceback).
 
-## Requêtes utiles
+## Useful queries
 
-Routes qui renvoient des 5xx (Prometheus) :
+Routes returning 5xx (Prometheus):
 
 ```promql
 topk(10, sum by (http_route, http_response_status_code) (
-  rate(http_server_request_duration_seconds_count{project="PROJET", env="ENV", service="SERVICE", http_response_status_code=~"5.."}[5m])
+  rate(http_server_request_duration_seconds_count{project="PROJECT", env="ENV", service="SERVICE", http_response_status_code=~"5.."}[5m])
 ))
 ```
 
-Exceptions dans les logs (Loki) :
+Exceptions in the logs (Loki):
 
 ```logql
-{project="PROJET", env="ENV", service="SERVICE"} |~ "(?i)(traceback|exception|error)"
+{project="PROJECT", env="ENV", service="SERVICE"} |~ "(?i)(traceback|exception|error)"
 ```
 
-Traces en erreur (Tempo, TraceQL) :
+Failed traces (Tempo, TraceQL):
 
 ```traceql
 {resource.service.name="SERVICE" && kind=server && status=error}
 ```
 
-## Causes probables
+## Likely causes
 
-- **Déploiement récent** : une régression dans le code. Comparez l'heure de début avec celle du dernier déploiement.
-- **Dépendance indisponible** : base de données, Redis, API externe. Les traces montrent un span client en erreur ou en timeout.
-- **Saturation** : workers gunicorn/uvicorn tous occupés, pool de connexions SQL épuisé. La latence monte en même temps.
-- **Configuration** : variable d'environnement manquante, secret expiré, migration non appliquée.
+- **Recent deployment**: a regression in the code. Compare the start time with the last deployment.
+- **Dependency unavailable**: database, Redis, external API. Traces show a client span failing or timing out.
+- **Saturation**: all gunicorn/uvicorn workers busy, SQL connection pool exhausted. Latency rises at the same time.
+- **Configuration**: missing environment variable, expired secret, unapplied migration.
 
 ## Actions
 
-1. Si un déploiement vient d'avoir lieu et que les erreurs ont commencé juste après : **revenez à la version précédente**, puis analysez à froid.
-2. Si une dépendance est en cause : vérifiez son état (dashboards PostgreSQL ou Redis, statut du fournisseur externe).
-3. Si c'est une saturation : augmentez le nombre de workers ou de réplicas, et vérifiez le pool de connexions.
-4. Corrigez la cause, puis ajoutez un test qui reproduit l'erreur.
+1. If a deployment just happened and errors started right after: **roll back to the previous version**, then investigate calmly.
+2. If a dependency is at fault: check its state (PostgreSQL or Redis dashboards, external provider status page).
+3. If it is saturation: increase the number of workers or replicas, and check the connection pool.
+4. Fix the cause, then add a test that reproduces the error.
 
-## Vérifier le retour à la normale
+## Verify recovery
 
-- La courbe *Part de réponses 5xx et seuil* repasse sous le seuil et y reste 10 minutes.
-- L'alerte passe à l'état *resolved* (une notification de résolution est envoyée).
-- Plus de nouvelles traces dans *Requêtes en erreur*.
+- The *Share of 5xx responses and threshold* graph drops back below the threshold and stays there for 10 minutes.
+- The alert switches to *resolved* (a resolution notification is sent).
+- No new traces in *Failed requests*.

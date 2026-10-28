@@ -29,7 +29,7 @@ func Run(args ...string) error {
 	cmd.Stdout = Out
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("docker %s : %w", strings.Join(args, " "), err)
+		return fmt.Errorf("docker %s: %w", strings.Join(args, " "), err)
 	}
 	return nil
 }
@@ -68,13 +68,13 @@ func Available() error {
 		return nil
 	}
 	if _, err := exec.LookPath("docker"); err != nil {
-		return errors.New("la commande docker est introuvable : installez Docker Engine (Linux) ou Docker Desktop (Mac, Windows)")
+		return errors.New("docker command not found: install Docker Engine (Linux) or Docker Desktop (Mac, Windows)")
 	}
 	if _, err := Output("version", "--format", "{{.Server.Version}}"); err != nil {
-		return fmt.Errorf("le démon Docker ne répond pas (%v) ; est-il démarré, et votre utilisateur a-t-il accès au socket ?", err)
+		return fmt.Errorf("the Docker daemon is not responding (%v); is it running, and does your user have access to the socket?", err)
 	}
 	if _, err := Output("compose", "version"); err != nil {
-		return errors.New("le plugin docker compose v2 est requis (docker compose version)")
+		return errors.New("the docker compose v2 plugin is required (docker compose version)")
 	}
 	return nil
 }
@@ -82,7 +82,7 @@ func Available() error {
 // EnsureNetwork creates a bridge network if it does not exist yet.
 func EnsureNetwork(name string) error {
 	if DryRun {
-		fmt.Fprintln(Out, "  [dry-run] docker network create "+name+" (si absent)")
+		fmt.Fprintln(Out, "  [dry-run] docker network create "+name+" (if missing)")
 		return nil
 	}
 	if _, err := Output("network", "inspect", name); err == nil {
@@ -90,7 +90,7 @@ func EnsureNetwork(name string) error {
 	}
 	_, err := Output("network", "create", "--driver", "bridge", name)
 	if err != nil {
-		return fmt.Errorf("création du réseau %s : %w", name, err)
+		return fmt.Errorf("creating network %s: %w", name, err)
 	}
 	return nil
 }

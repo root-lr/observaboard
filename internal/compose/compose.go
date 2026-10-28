@@ -67,12 +67,12 @@ func Load(path string) (*File, error) {
 	}
 	var raw map[string]any
 	if err := yaml.Unmarshal(data, &raw); err != nil {
-		return nil, fmt.Errorf("%s illisible : %w", filepath.Base(path), err)
+		return nil, fmt.Errorf("cannot read %s: %w", filepath.Base(path), err)
 	}
 	f := &File{Path: path, Dir: filepath.Dir(path), Services: map[string]*Service{}}
 	svcs, _ := raw["services"].(map[string]any)
 	if len(svcs) == 0 {
-		return nil, fmt.Errorf("%s ne contient aucun service", filepath.Base(path))
+		return nil, fmt.Errorf("%s contains no services", filepath.Base(path))
 	}
 	for name, v := range svcs {
 		m, _ := v.(map[string]any)
@@ -100,10 +100,10 @@ func Load(path string) (*File, error) {
 		}
 		var err error
 		if s.Command, err = commandValue(m["command"]); err != nil {
-			return nil, fmt.Errorf("services.%s.command : %w", name, err)
+			return nil, fmt.Errorf("services.%s.command: %w", name, err)
 		}
 		if s.Entrypoint, err = commandValue(m["entrypoint"]); err != nil {
-			return nil, fmt.Errorf("services.%s.entrypoint : %w", name, err)
+			return nil, fmt.Errorf("services.%s.entrypoint: %w", name, err)
 		}
 		switch n := m["networks"].(type) {
 		case []any:
@@ -186,7 +186,7 @@ func commandValue(v any) ([]string, error) {
 		}
 		return out, nil
 	default:
-		return nil, errors.New("format non reconnu")
+		return nil, errors.New("unrecognized format")
 	}
 }
 
@@ -277,7 +277,7 @@ func SplitWords(s string) ([]string, error) {
 		}
 	}
 	if quote != 0 {
-		return nil, errors.New("guillemet non fermé")
+		return nil, errors.New("unclosed quote")
 	}
 	if inTok {
 		out = append(out, cur.String())
@@ -289,7 +289,7 @@ func SplitWords(s string) ([]string, error) {
 // index of a built service.
 func (f *File) EffectiveDockerfile(s *Service) (*Dockerfile, int, error) {
 	if s.Build == nil {
-		return nil, -1, fmt.Errorf("pas de build")
+		return nil, -1, fmt.Errorf("no build")
 	}
 	df, err := ParseDockerfile(f.DockerfilePath(s))
 	if err != nil {

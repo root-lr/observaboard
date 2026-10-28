@@ -113,7 +113,7 @@ func ParseDockerfileString(src string) *Dockerfile {
 // StageIndex returns the stage a build targets: the named one, or the last.
 func (d *Dockerfile) StageIndex(target string) (int, error) {
 	if len(d.Stages) == 0 {
-		return -1, fmt.Errorf("aucune instruction FROM")
+		return -1, fmt.Errorf("no FROM instruction")
 	}
 	if target == "" {
 		return len(d.Stages) - 1, nil
@@ -123,7 +123,7 @@ func (d *Dockerfile) StageIndex(target string) (int, error) {
 			return i, nil
 		}
 	}
-	return -1, fmt.Errorf("étape %q introuvable dans le Dockerfile", target)
+	return -1, fmt.Errorf("stage %q not found in the Dockerfile", target)
 }
 
 // resolve follows FROM <earlier stage> to find inherited values.

@@ -67,11 +67,11 @@ func renderTemplate(name string, data any) ([]byte, error) {
 	}
 	t, err := template.New(filepath.Base(name)).Option("missingkey=error").Parse(string(src))
 	if err != nil {
-		return nil, fmt.Errorf("%s : %w", name, err)
+		return nil, fmt.Errorf("%s: %w", name, err)
 	}
 	var b bytes.Buffer
 	if err := t.Execute(&b, data); err != nil {
-		return nil, fmt.Errorf("%s : %w", name, err)
+		return nil, fmt.Errorf("%s: %w", name, err)
 	}
 	return b.Bytes(), nil
 }
@@ -125,7 +125,7 @@ func Files(s *Settings, tokens []Token) (map[string][]byte, map[string]os.FileMo
 	for _, d := range dashboards.All() {
 		j, err := d.JSON()
 		if err != nil {
-			return nil, nil, fmt.Errorf("dashboard %s : %w", d.UID, err)
+			return nil, nil, fmt.Errorf("dashboard %s: %w", d.UID, err)
 		}
 		p := "grafana/dashboards/" + d.Path()
 		files[p] = j
@@ -191,8 +191,8 @@ func (d Dir) EnsureAdminPassword() (created string, err error) {
 		return "", err
 	}
 	pw := base64.RawURLEncoding.EncodeToString(raw)
-	content := "# Secrets du central ObservaBoard. Ne pas versionner.\n" +
-		"# Le mot de passe admin n'est lu qu'au premier démarrage de Grafana ; ensuite, changez-le dans Grafana.\n" +
+	content := "# ObservaBoard central secrets. Do not commit.\n" +
+		"# The admin password is only read on Grafana's first start; after that, change it in Grafana.\n" +
 		"GF_SECURITY_ADMIN_PASSWORD=" + pw + "\n"
 	if _, err := fsutil.WriteFile(p, []byte(content), 0o600); err != nil {
 		return "", err

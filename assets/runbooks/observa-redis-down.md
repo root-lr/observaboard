@@ -1,42 +1,42 @@
-# ObservaRedisDown — Redis injoignable
+# ObservaRedisDown — Redis unreachable
 
-**Sévérité :** critique · **Déclenchement :** l'exporter de l'agent n'arrive plus à se connecter à Redis depuis 2 minutes (`redis_up` = 0).
+**Severity:** critical · **Fires when:** the agent's exporter has been unable to connect to Redis for 2 minutes (`redis_up` = 0).
 
-## Ce que signifie l'alerte
+## What the alert means
 
-Redis est arrêté, refuse les connexions, ou l'agent ne peut plus l'atteindre (réseau `observa`, mot de passe).
+Redis is stopped, refusing connections, or the agent can no longer reach it (`observa` network, password).
 
-## Impact pour les utilisateurs
+## User impact
 
-Selon l'usage de Redis : cache désactivé (lenteur), sessions perdues (déconnexions), file Celery bloquée (tâches non exécutées).
+Depending on how Redis is used: cache disabled (slowness), lost sessions (logouts), Celery queue blocked (tasks not run).
 
-## Dashboards à ouvrir
+## Dashboards to open
 
-1. **Redis** : *Joignable*, *Mémoire*, *Logs du service*.
-2. **Worker Celery** si Redis sert de broker.
+1. **Redis**: *Reachable*, *Memory*, *Service logs*.
+2. **Celery worker** if Redis is the broker.
 
-## Requêtes utiles
+## Useful queries
 
 ```logql
-{project="PROJET", env="ENV", service="SERVICE"}
+{project="PROJECT", env="ENV", service="SERVICE"}
 ```
 
 ```bash
 docker compose ps SERVICE
-docker exec -it <conteneur-redis> redis-cli ping
+docker exec -it <redis-container> redis-cli ping
 ```
 
-## Causes probables
+## Likely causes
 
-- **Redis arrêté** : crash, OOM, redémarrage du serveur.
-- **Mémoire** : Redis tué par le noyau.
-- **Mot de passe** changé sans mettre à jour la variable de l'agent.
+- **Redis stopped**: crash, OOM, server reboot.
+- **Memory**: Redis killed by the kernel.
+- **Password** changed without updating the agent's variable.
 
 ## Actions
 
-1. Relancez Redis : `docker compose up -d SERVICE`.
-2. Mot de passe : `observa agent env set <VARIABLE>=<motdepasse>` puis `observa agent reload`.
+1. Restart Redis: `docker compose up -d SERVICE`.
+2. Password: `observa agent env set <VARIABLE>=<password>` then `observa agent reload`.
 
-## Vérifier le retour à la normale
+## Verify recovery
 
-- *Joignable* repasse à 1, la file Celery se vide.
+- *Reachable* goes back to 1, the Celery queue drains.

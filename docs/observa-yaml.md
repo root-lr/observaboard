@@ -1,22 +1,22 @@
-# Référence : observa.yaml
+# Reference: observa.yaml
 
-`observa.yaml` décrit un projet. Il vit dans le dépôt du projet, est créé par `observa init` et appliqué sur chaque serveur par `observa apply`. Relancer `observa init` conserve vos modifications : les services déjà décrits ne sont pas touchés.
+`observa.yaml` describes a project. It lives in the project's repository, is created by `observa init` and applied on each server by `observa apply`. Running `observa init` again keeps your changes: services already described are left untouched.
 
 ```yaml
 version: 1
-project: wulo          # minuscules, chiffres, tirets (1 à 40 caractères)
+project: wulo          # lowercase letters, digits, hyphens (1 to 40 characters)
 env: prod              # prod, staging, preprod…
 
 services:
   api:
     preset: django
-    runtime: python        # python | node — détecté par observa init
-    instrumentation: otel  # otel | ebpf | none — défaut selon le preset
-    port: 8000             # port interne
-    healthcheck: /health/  # exclu des traces
+    runtime: python        # python | node — detected by observa init
+    instrumentation: otel  # otel | ebpf | none — default depends on the preset
+    port: 8000             # internal port
+    healthcheck: /health/  # excluded from traces
     alerts:
-      latency_p95_ms: 800  # défaut 1000
-      error_rate_pct: 2    # défaut 5
+      latency_p95_ms: 800  # default 1000
+      error_rate_pct: 2    # default 5
 
   worker:
     preset: celery
@@ -25,57 +25,57 @@ services:
 
   db:
     preset: postgres
-    # Variable du .env de l'agent contenant la chaîne de connexion de l'exporter.
-    # Défaut : OBSERVA_SECRET_<PROJET>_<ENV>_<SERVICE>
+    # Variable in the agent's .env holding the exporter's connection string.
+    # Default: OBSERVA_SECRET_<PROJECT>_<ENV>_<SERVICE>
     secret_env: OBSERVA_SECRET_WULO_PROD_DB
 
   cache:
     preset: redis
     alerts:
-      queue_length: 500    # file Celery
+      queue_length: 500    # Celery queue
 
   legacy:
     preset: generic
-    container: legacy_app_1   # conteneur lancé avec docker run
+    container: legacy_app_1   # container started with docker run
 
-ignored: [traffic]           # services du compose volontairement non surveillés
+ignored: [traffic]           # compose services intentionally not monitored
 
-notifications:               # canaux définis dans central.yaml
-  critical: [telegram-ops, email-moi]
+notifications:               # channels defined in central.yaml
+  critical: [telegram-ops, email-me]
   warning: [slack-wulo]
 ```
 
-Répondre « ignorer » à `observa init` pour un service l'ajoute à `ignored` : il n'est plus proposé aux exécutions suivantes. Les noms de services suivent ceux du compose (`celery_worker` est accepté) ; l'alias réseau et l'image dérivée en utilisent une forme compatible DNS (`celery-worker`).
+Answering "ignore" to `observa init` for a service adds it to `ignored`: it is no longer offered on later runs. Service names follow the compose file (`celery_worker` is accepted); the network alias and the derived image use a DNS-compatible form (`celery-worker`).
 
-## Champs d'un service
+## Service fields
 
-| Champ | Défaut | Description |
+| Field | Default | Description |
 | --- | --- | --- |
-| `preset` | requis | `django`, `fastapi`, `celery`, `postgres`, `redis`, `generic` (`observa preset list`) |
-| `runtime` | selon le preset | `python` ou `node` : active l'instrumentation sans code |
-| `instrumentation` | `otel` si un runtime est connu, sinon `none` | `otel` (SDK OpenTelemetry, niveau 2), `ebpf` (agent `--ebpf` requis, port requis), `none` |
-| `port` | selon le preset | port d'écoute interne ; sert aux exporters et à eBPF |
-| `healthcheck` | — | chemin HTTP exclu des traces |
-| `container` | `<projet>-<env>-<service>` | nom du conteneur pour les services lancés avec `docker run` |
-| `secret_env` | `OBSERVA_SECRET_…` | variable de l'agent contenant le DSN PostgreSQL ou le mot de passe Redis |
-| `alerts` | défauts du preset | seuils surchargés (voir ci-dessous) |
+| `preset` | required | `django`, `fastapi`, `celery`, `postgres`, `redis`, `generic` (`observa preset list`) |
+| `runtime` | depends on the preset | `python` or `node`: enables zero-code instrumentation |
+| `instrumentation` | `otel` if a runtime is known, otherwise `none` | `otel` (OpenTelemetry SDK, level 2), `ebpf` (requires agent `--ebpf` and a port), `none` |
+| `port` | depends on the preset | internal listening port; used by exporters and eBPF |
+| `healthcheck` | — | HTTP path excluded from traces |
+| `container` | `<project>-<env>-<service>` | container name for services started with `docker run` |
+| `secret_env` | `OBSERVA_SECRET_…` | agent variable holding the PostgreSQL DSN or the Redis password |
+| `alerts` | preset defaults | overridden thresholds (see below) |
 
-## Seuils (`alerts`)
+## Thresholds (`alerts`)
 
-| Preset | Clé | Défaut | Unité |
+| Preset | Key | Default | Unit |
 | --- | --- | --- | --- |
-| django, fastapi, generic | `latency_p95_ms` | 1000 | millisecondes |
-| django, fastapi, generic | `error_rate_pct` | 5 | % de réponses 5xx |
-| celery | `task_failure_pct` | 10 | % de tâches en échec |
-| postgres | `connections_pct` | 80 | % de `max_connections` |
-| redis | `memory_pct` | 90 | % de `maxmemory` |
-| redis | `queue_length` | 100 | messages dans la file `celery` |
+| django, fastapi, generic | `latency_p95_ms` | 1000 | milliseconds |
+| django, fastapi, generic | `error_rate_pct` | 5 | % of 5xx responses |
+| celery | `task_failure_pct` | 10 | % of failed tasks |
+| postgres | `connections_pct` | 80 | % of `max_connections` |
+| redis | `memory_pct` | 90 | % of `maxmemory` |
+| redis | `queue_length` | 100 | messages in the `celery` queue |
 
-Une clé inconnue ou une valeur hors limites est refusée par `observa validate`, qui est utilisable en CI.
+An unknown key or an out-of-range value is rejected by `observa validate`, which can be used in CI.
 
-## Secrets des bases de données
+## Database secrets
 
-L'exporter PostgreSQL a besoin d'un utilisateur en lecture. Créez-le dans la base, puis enregistrez la chaîne de connexion **sur le serveur**. Elle n'est jamais écrite dans le dépôt.
+The PostgreSQL exporter needs a read-only user. Create it in the database, then store the connection string **on the server**. It is never written to the repository.
 
 ```sql
 CREATE USER observa WITH PASSWORD '…';
@@ -86,8 +86,8 @@ GRANT pg_monitor TO observa;
 observa agent env set OBSERVA_SECRET_WULO_PROD_DB='postgresql://observa:…@wulo-prod-db:5432/wulo?sslmode=disable'
 ```
 
-L'hôte est l'alias du service sur le réseau `observa` (`<projet>-<env>-<service>`).
+The host is the service's alias on the `observa` network (`<project>-<env>-<service>`).
 
 ## Notifications
 
-`critical` et `warning` listent des canaux **définis dans `central.yaml`**. Sans `notifications`, les alertes du projet vont aux canaux par défaut du central.
+`critical` and `warning` list channels **defined in `central.yaml`**. Without `notifications`, the project's alerts go to the central's default channels.

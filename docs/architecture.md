@@ -1,69 +1,69 @@
 # Architecture
 
-ObservaBoard sépare **le central**, qui stocke, affiche et alerte, et **les agents**, un par serveur, qui collectent et poussent. La CLI `observa` génère et maintient toute la configuration des deux côtés.
+ObservaBoard separates **the central**, which stores, displays and alerts, from **the agents**, one per server, which collect and push. The `observa` CLI generates and maintains all the configuration on both sides.
 
-## Composants
+## Components
 
-| Côté | Composant | Version | Rôle |
+| Side | Component | Version | Role |
 | --- | --- | --- | --- |
-| Central | Caddy | 2.11 | Seul port exposé : HTTPS (Let's Encrypt ou CA interne), authentification des agents, runbooks, proxy vers Grafana |
-| Central | Prometheus | 3.15 | Reçoit les métriques (remote write), évalue les règles d'alerte |
-| Central | Loki | 3.7 | Stocke les logs |
-| Central | Tempo | 3.1 (mono-binaire) | Stocke les traces, **calcule les métriques HTTP et Celery à partir des traces** |
-| Central | Alertmanager | 0.34 | Regroupe et route les alertes vers les canaux |
-| Central | Grafana | 13.3 | Dashboards, exploration, corrélation logs ↔ traces |
-| Agent | Grafana Alloy | 1.21 | Découverte Docker, logs, cAdvisor, métriques hôte, récepteur OTLP, eBPF (Beyla), exporters PostgreSQL et Redis |
+| Central | Caddy | 2.11 | Only exposed port: HTTPS (Let's Encrypt or internal CA), agent authentication, runbooks, proxy to Grafana |
+| Central | Prometheus | 3.15 | Receives metrics (remote write), evaluates alert rules |
+| Central | Loki | 3.7 | Stores logs |
+| Central | Tempo | 3.1 (single binary) | Stores traces, **computes HTTP and Celery metrics from traces** |
+| Central | Alertmanager | 0.34 | Groups alerts and routes them to channels |
+| Central | Grafana | 13.3 | Dashboards, exploration, logs ↔ traces correlation |
+| Agent | Grafana Alloy | 1.21 | Docker discovery, logs, cAdvisor, host metrics, OTLP receiver, eBPF (Beyla), PostgreSQL and Redis exporters |
 
-Les versions sont épinglées dans `internal/version/version.go`.
+Versions are pinned in `internal/version/version.go`.
 
-## Flux de données
+## Data flow
 
 ```text
-Application (SDK OpenTelemetry, niveau 2) ──OTLP/HTTP──▶ agent :4318 (réseau Docker `observa`)
-Conteneurs (socket Docker) ──────────────────────────────▶ agent : logs + cAdvisor
-Hôte (/proc, /sys, textfile) ────────────────────────────▶ agent : métriques hôte, seuils, routage
-PostgreSQL / Redis (réseau `observa`) ───────────────────▶ agent : exporters
+Application (OpenTelemetry SDK, level 2) ──OTLP/HTTP──▶ agent :4318 (Docker network `observa`)
+Containers (Docker socket) ──────────────────────────────▶ agent: logs + cAdvisor
+Host (/proc, /sys, textfile) ────────────────────────────▶ agent: host metrics, thresholds, routing
+PostgreSQL / Redis (`observa` network) ──────────────────▶ agent: exporters
 
 agent ──HTTPS + basic auth (agent, token)──▶ Caddy ─┬─ /ingest/prometheus/write ─▶ Prometheus (remote write)
                                                     ├─ /ingest/loki/push ────────▶ Loki
                                                     └─ /ingest/otlp/v1/traces ───▶ Tempo
-Tempo (metrics generator : span metrics, graphe de services) ──remote write──▶ Prometheus
-Prometheus (règles) ──▶ Alertmanager ──▶ email · Slack · Telegram · webhook · heartbeat
+Tempo (metrics generator: span metrics, service graph) ──remote write──▶ Prometheus
+Prometheus (rules) ──▶ Alertmanager ──▶ email · Slack · Telegram · webhook · heartbeat
 ```
 
-L'agent bufferise sur disque (WAL) : une coupure réseau de quelques heures ne perd pas les métriques.
+The agent buffers on disk (WAL): a network outage of a few hours does not lose metrics.
 
-## Les labels, épine dorsale
+## Labels, the backbone
 
-Chaque série, ligne de log et trace porte les mêmes étiquettes :
+Every series, log line and trace carries the same labels:
 
-| Label | Origine |
+| Label | Source |
 | --- | --- |
-| `project`, `env`, `service`, `preset` | labels Docker `observa.*` (posés par l'override ou `observa attach`), attributs de ressource `observa.*` (OpenTelemetry) |
-| `host` | label externe ajouté par l'agent (`--host`, nom du serveur par défaut) |
-| `container` | nom du conteneur |
+| `project`, `env`, `service`, `preset` | Docker `observa.*` labels (set by the override or `observa attach`), `observa.*` resource attributes (OpenTelemetry) |
+| `host` | external label added by the agent (`--host`, server name by default) |
+| `container` | container name |
 
-Les dashboards filtrent sur ces labels. Les règles d'alerte agrègent par `project, env, service`. Le routage des notifications utilise les labels `notify_critical` et `notify_warning`, joints aux alertes.
+Dashboards filter on these labels. Alert rules aggregate by `project, env, service`. Notification routing uses the `notify_critical` and `notify_warning` labels, joined onto the alerts.
 
-## Pourquoi les métriques HTTP viennent des traces
+## Why HTTP metrics come from traces
 
-Les SDK OpenTelemetry savent exporter des métriques HTTP, mais ces métriques deviennent fausses avec les serveurs multi-processus comme gunicorn ou uvicorn avec workers. Chaque worker exporte en effet les mêmes séries, et leurs compteurs se mélangent. ObservaBoard désactive donc les métriques des SDK (`OTEL_METRICS_EXPORTER=none`) et fait calculer par Tempo des **span metrics** à partir des spans serveur :
+OpenTelemetry SDKs can export HTTP metrics, but those metrics become wrong with multi-process servers such as gunicorn or uvicorn with workers: each worker exports the same series, and their counters get mixed up. ObservaBoard therefore disables SDK metrics (`OTEL_METRICS_EXPORTER=none`) and has Tempo compute **span metrics** from server spans:
 
 - `traces_spanmetrics_calls_total{project, env, service, span_kind, status_code, http_request_method, http_route, http_response_status_code}`
 - `traces_spanmetrics_latency_bucket{…, le}`
 
-C'est juste quel que soit le nombre de workers. C'est identique pour tous les langages et pour les traces eBPF. Et ça donne les dépendances (SQL, appels sortants) sans configuration. La contrepartie : il faut échantillonner les traces à 100 %, le réglage par défaut. `project` et `env` sont posés par les `dimension_mappings` de Tempo à partir des attributs `observa.project` et `observa.env`.
+This is correct whatever the number of workers. It is the same for every language and for eBPF traces. And it yields dependencies (SQL, outgoing calls) with no configuration. The trade-off: traces must be sampled at 100%, the default setting. `project` and `env` are set by Tempo's `dimension_mappings` from the `observa.project` and `observa.env` attributes.
 
-## Seuils et routage sans configuration centrale
+## Thresholds and routing without central configuration
 
-`observa apply` écrit sur l'agent un fichier lu par le *textfile collector* :
+`observa apply` writes a file on the agent that is read by the *textfile collector*:
 
 ```text
 observa_service_info{project="wulo",env="prod",service="api",preset="django",notify_critical="telegram-ops",notify_warning="slack"} 1
 observa_service_threshold{project="wulo",env="prod",service="api",threshold="http_latency_p95_seconds"} 0.8
 ```
 
-Les règles du central combinent ces séries avec des valeurs par défaut :
+The central's rules combine these series with default values:
 
 ```promql
 observa:threshold:http_latency_p95_seconds =
@@ -71,28 +71,28 @@ observa:threshold:http_latency_p95_seconds =
   or on (project, env, service) (observa:service:present * 0 + 1)
 ```
 
-Chaque alerte est multipliée par `observa:service:routing`, qui vaut 1, avec `group_left (notify_critical, notify_warning)`. Les labels de routage s'ajoutent ainsi sans changer la valeur. Alertmanager route ensuite par expression régulière sur ces labels (`notify_critical=~"(.+,)?telegram-ops(,.+)?"`). Les canaux eux-mêmes, avec leurs secrets, restent définis uniquement sur le central.
+Each alert is multiplied by `observa:service:routing`, which equals 1, with `group_left (notify_critical, notify_warning)`. The routing labels are thus added without changing the value. Alertmanager then routes with a regular expression on these labels (`notify_critical=~"(.+,)?telegram-ops(,.+)?"`). The channels themselves, with their secrets, are defined only on the central.
 
-Résultat : un projet modifie ses seuils et ses destinataires dans son dépôt, sans toucher au central ni redéployer de règles.
+Result: a project changes its thresholds and recipients in its own repository, without touching the central or redeploying rules.
 
-## Réseau Docker `observa`
+## The `observa` Docker network
 
-L'agent et les services surveillés partagent un réseau bridge externe, `observa`. L'override ajoute chaque service à ce réseau avec un alias unique (`<projet>-<env>-<service>`), en plus de son réseau d'origine. Cela permet :
+The agent and the monitored services share an external bridge network, `observa`. The override adds each service to this network with a unique alias (`<project>-<env>-<service>`), in addition to its original network. This lets:
 
-- aux applications d'envoyer leurs traces à `http://observa-agent:4318` ;
-- aux exporters de l'agent de joindre `wulo-prod-db:5432` sans publier de port.
+- applications send their traces to `http://observa-agent:4318`;
+- the agent's exporters reach `wulo-prod-db:5432` without publishing a port.
 
-## Fichiers générés
+## Generated files
 
 | Central (`/opt/observa/central`) | Agent (`/opt/observa/agent`) |
 | --- | --- |
-| `central.yaml` (réglages, canaux, 0600) | `agent.yaml` (réglages) |
-| `tokens.yaml` (hachés bcrypt, 0600) | `.env` (token, secrets des exporters, 0600) |
-| `.env` (mot de passe admin Grafana initial) | `config.alloy` (généré) |
-| `docker-compose.yml`, `caddy/`, `prometheus/`, `alertmanager/`, `loki/`, `tempo/`, `grafana/`, `runbooks/` (générés) | `docker-compose.yml`, `config/config.alloy` (+ `config/ca.crt`), `projects/*.yaml`, `attach.yaml`, `textfile/*.prom` |
+| `central.yaml` (settings, channels, 0600) | `agent.yaml` (settings) |
+| `tokens.yaml` (bcrypt hashes, 0600) | `.env` (token, exporter secrets, 0600) |
+| `.env` (initial Grafana admin password) | `config.alloy` (generated) |
+| `docker-compose.yml`, `caddy/`, `prometheus/`, `alertmanager/`, `loki/`, `tempo/`, `grafana/`, `runbooks/` (generated) | `docker-compose.yml`, `config/config.alloy` (+ `config/ca.crt`), `projects/*.yaml`, `attach.yaml`, `textfile/*.prom` |
 
-Les conteneurs montent des **dossiers**, jamais des fichiers seuls. Les fichiers sont réécrits de façon atomique, donc par remplacement. Un fichier monté seul resterait sur l'ancienne version, et les rechargements à chaud (Caddy, Prometheus, Alertmanager, Alloy) ne verraient pas les changements.
+Containers mount **directories**, never single files. Files are rewritten atomically, i.e. by replacement. A file mounted on its own would stay on the old version, and hot reloads (Caddy, Prometheus, Alertmanager, Alloy) would not see the changes.
 
-Le dossier du central est en mode 0700, car il contient les secrets. Les conteneurs n'en voient que les sous-dossiers montés.
+The central directory has mode 0700 because it holds the secrets. Containers only see the mounted subdirectories.
 
-Les fichiers générés ne doivent pas être modifiés à la main. Modifiez `central.yaml` ou `observa.yaml`, puis lancez `observa central reload` ou `observa apply`.
+Generated files must not be edited by hand. Edit `central.yaml` or `observa.yaml`, then run `observa central reload` or `observa apply`.

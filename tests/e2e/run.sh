@@ -16,7 +16,7 @@ export OBSERVA_LOCAL_DIR="$DIR"
 URL=http://127.0.0.1:3000
 
 log()  { printf '\n\033[1m== %s\033[0m\n' "$*"; }
-fail() { printf '\n\033[31mÉCHEC : %s\033[0m\n' "$*"; dump; exit 1; }
+fail() { printf '\n\033[31mFAILED: %s\033[0m\n' "$*"; dump; exit 1; }
 
 dump() {
   echo "--- diagnostics"
@@ -28,7 +28,7 @@ dump() {
 }
 
 cleanup() {
-  log "Arrêt"
+  log "Stopping"
   "$OBSERVA" down --all-in-one --volumes || true
   rm -rf "$DIR"
 }
@@ -52,7 +52,7 @@ wait_for() {
   local what=$1 timeout=$2; shift 2
   local start=$SECONDS
   until "$@" >/dev/null 2>&1; do
-    (( SECONDS - start > timeout )) && fail "$what (après ${timeout}s)"
+    (( SECONDS - start > timeout )) && fail "$what (after ${timeout}s)"
     sleep 10
   done
   echo "✓ $what ($((SECONDS - start))s)"
@@ -69,33 +69,33 @@ has_traces() {
 }
 has_dashboard() { grafana_api "/api/dashboards/uid/$1" >/dev/null; }
 
-log "Démarrage all-in-one avec la boutique d'exemple"
+log "Starting all-in-one with the example shop"
 "$OBSERVA" up --all-in-one --with-example || fail "observa up"
 
-log "Les données arrivent"
-wait_for "Grafana répond"                                  180 curl -fsS "$URL/api/health"
-wait_for "dashboards provisionnés"                          120 has_dashboard observa-http
-wait_for "métriques de l'hôte"                             240 has_series 'node_boot_time_seconds{job="observa/host"}'
-wait_for "métriques des conteneurs"                         240 has_series 'container_last_seen{project="boutique", service="web"}'
-wait_for "seuils publiés par observa apply"                 240 has_series 'observa_service_threshold{project="boutique", service="web"}'
-wait_for "métriques HTTP depuis les traces (span metrics)"  420 has_series 'traces_spanmetrics_calls_total{project="boutique", service="web", span_kind="SPAN_KIND_SERVER"}'
-wait_for "règle observa:http_requests:rate5m"               300 has_series 'observa:http_requests:rate5m{project="boutique", service="web"}'
-wait_for "métriques PostgreSQL"                             240 has_series 'pg_up{project="boutique", service="db"} == 1'
-wait_for "métriques Redis"                                  240 has_series 'redis_up{project="boutique", service="redis"} == 1'
-wait_for "tâches Celery (traces du worker)"                 420 has_series 'traces_spanmetrics_calls_total{project="boutique", service="worker", span_kind="SPAN_KIND_CONSUMER"}'
-wait_for "logs du service web dans Loki"                    240 has_logs
-wait_for "traces du service web dans Tempo"                 240 has_traces
+log "Data is arriving"
+wait_for "Grafana responds"                               180 curl -fsS "$URL/api/health"
+wait_for "dashboards provisioned"                         120 has_dashboard observa-http
+wait_for "host metrics"                                   240 has_series 'node_boot_time_seconds{job="observa/host"}'
+wait_for "container metrics"                              240 has_series 'container_last_seen{project="boutique", service="web"}'
+wait_for "thresholds published by observa apply"          240 has_series 'observa_service_threshold{project="boutique", service="web"}'
+wait_for "HTTP metrics from traces (span metrics)"        420 has_series 'traces_spanmetrics_calls_total{project="boutique", service="web", span_kind="SPAN_KIND_SERVER"}'
+wait_for "observa:http_requests:rate5m rule"              300 has_series 'observa:http_requests:rate5m{project="boutique", service="web"}'
+wait_for "PostgreSQL metrics"                             240 has_series 'pg_up{project="boutique", service="db"} == 1'
+wait_for "Redis metrics"                                  240 has_series 'redis_up{project="boutique", service="redis"} == 1'
+wait_for "Celery tasks (worker traces)"                   420 has_series 'traces_spanmetrics_calls_total{project="boutique", service="worker", span_kind="SPAN_KIND_CONSUMER"}'
+wait_for "web service logs in Loki"                       240 has_logs
+wait_for "web service traces in Tempo"                    240 has_traces
 
 log "Diagnostic"
 "$OBSERVA" doctor --agent-dir "$DIR/agent" --central-dir "$DIR/central" --project-dir "$DIR/example" || fail "observa doctor"
 
-log "Panne simulée : 30 % d'erreurs 500 sur /api/products/"
+log "Simulated failure: 30% HTTP 500 errors on /api/products/"
 docker compose --project-directory "$DIR/example" -f "$DIR/example/compose.yaml" -f "$DIR/example/docker-compose.observa.yml" \
   exec -T web python manage.py chaos errors --minutes 15
-wait_for "alerte ObservaHighErrorRate déclenchée" 900 has_series 'ALERTS{alertname="ObservaHighErrorRate", alertstate="firing", project="boutique", service="web"}'
+wait_for "ObservaHighErrorRate alert firing" 900 has_series 'ALERTS{alertname="ObservaHighErrorRate", alertstate="firing", project="boutique", service="web"}'
 
-log "Runbook servi par Caddy"
-curl -fsS "$URL/runbooks/observa-high-error-rate" | grep -q "ObservaHighErrorRate" || fail "runbook introuvable"
-echo "✓ runbook disponible"
+log "Runbook served by Caddy"
+curl -fsS "$URL/runbooks/observa-high-error-rate" | grep -q "ObservaHighErrorRate" || fail "runbook not found"
+echo "✓ runbook available"
 
-log "Succès"
+log "Success"

@@ -19,7 +19,7 @@ class Product(models.Model):
 
 
 class Order(models.Model):
-    STATUS = [("pending", "En attente"), ("paid", "Payée"), ("confirmed", "Confirmée"), ("failed", "Échec")]
+    STATUS = [("pending", "Pending"), ("paid", "Paid"), ("confirmed", "Confirmed"), ("failed", "Failed")]
     product = models.ForeignKey(Product, on_delete=models.PROTECT, related_name="orders")
     quantity = models.PositiveIntegerField(default=1)
     status = models.CharField(max_length=12, choices=STATUS, default="pending")

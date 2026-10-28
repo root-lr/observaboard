@@ -1,7 +1,7 @@
-"""Pannes simulées, activées par `python manage.py chaos <mode>`.
+"""Simulated failures, enabled by `python manage.py chaos <mode>`.
 
-L'état est partagé entre le web et le worker via un fichier (volume `chaos`),
-avec une date d'expiration : une panne oubliée s'arrête toute seule.
+The state is shared between web and worker through a file (volume `chaos`),
+with an expiry date: a forgotten failure stops on its own.
 """
 import json
 import os
@@ -11,10 +11,10 @@ import time
 from django.conf import settings
 
 MODES = {
-    "errors": "30 % des appels à /api/products/ renvoient une erreur 500",
-    "latency": "+1,5 s sur les pages produits et les commandes",
-    "dependency": "le service de paiement externe ne répond plus (timeout)",
-    "tasks": "les tâches Celery d'envoi de confirmation échouent",
+    "errors": "30% of calls to /api/products/ return a 500 error",
+    "latency": "+1.5 s on product pages and orders",
+    "dependency": "the external payment service stops responding (timeout)",
+    "tasks": "Celery confirmation-sending tasks fail",
 }
 
 
@@ -52,7 +52,7 @@ def status():
 
 def maybe_fail(mode, probability=1.0):
     if active(mode) and random.random() < probability:
-        raise RuntimeError(f"Panne simulée ({mode}) : {MODES[mode]}")
+        raise RuntimeError(f"Simulated failure ({mode}): {MODES[mode]}")
 
 
 def maybe_slow(mode, seconds=1.5):

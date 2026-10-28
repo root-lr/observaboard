@@ -1,58 +1,58 @@
-# ObservaServiceDown — un service ne tourne plus
+# ObservaServiceDown — a service is no longer running
 
-**Sévérité :** critique · **Déclenchement :** le conteneur du service n'a plus été vu par l'agent depuis plus de 2 minutes.
+**Severity:** critical · **Fires when:** the agent has not seen the service's container for more than 2 minutes.
 
-## Ce que signifie l'alerte
+## What the alert means
 
-Le conteneur portant les labels `observa.*` de ce service n'existe plus ou est arrêté sur le serveur indiqué (`host`). L'alerte reste active 24 heures si le service a été supprimé volontairement.
+The container carrying this service's `observa.*` labels no longer exists or is stopped on the reported server (`host`). The alert stays active for 24 hours if the service was intentionally removed.
 
-## Impact pour les utilisateurs
+## User impact
 
-Tout ce que fournit ce service est indisponible : API, site, tâches de fond ou base de données selon le service.
+Everything this service provides is unavailable: API, website, background tasks or database, depending on the service.
 
-## Dashboards à ouvrir
+## Dashboards to open
 
-1. **Service · conteneur** : *Vu il y a* et *Redémarrages* ; les derniers logs avant l'arrêt sont dans *Logs du service*.
-2. **Serveurs** : vérifiez que le serveur n'est pas saturé (mémoire, disque).
+1. **Service · container**: *Last seen* and *Restarts*; the last logs before the stop are in *Service logs*.
+2. **Servers**: check that the server is not saturated (memory, disk).
 
-## Requêtes utiles
+## Useful queries
 
-Dernières lignes de log avant l'arrêt :
+Last log lines before the stop:
 
 ```logql
-{project="PROJET", env="ENV", service="SERVICE"}
+{project="PROJECT", env="ENV", service="SERVICE"}
 ```
 
-Depuis quand le service n'est plus vu :
+How long the service has been unseen:
 
 ```promql
-time() - observa:service:last_seen_timestamp{project="PROJET", env="ENV", service="SERVICE"}
+time() - observa:service:last_seen_timestamp{project="PROJECT", env="ENV", service="SERVICE"}
 ```
 
-Sur le serveur :
+On the server:
 
 ```bash
 docker ps -a --filter label=observa.service=SERVICE
-docker logs --tail 100 <conteneur>
-docker inspect <conteneur> --format '{{.State.ExitCode}} {{.State.OOMKilled}} {{.State.Error}}'
+docker logs --tail 100 <container>
+docker inspect <container> --format '{{.State.ExitCode}} {{.State.OOMKilled}} {{.State.Error}}'
 ```
 
-## Causes probables
+## Likely causes
 
-- **Crash au démarrage** : erreur de configuration, migration, dépendance absente. Code de sortie non nul.
-- **Tué par manque de mémoire** : `OOMKilled` à `true`.
-- **Arrêt manuel** ou déploiement interrompu (`docker compose down` sans `up`).
-- **Serveur redémarré** sans politique `restart:` sur le service.
-- **Suppression volontaire** du service.
+- **Crash at startup**: configuration error, migration, missing dependency. Non-zero exit code.
+- **Killed for lack of memory**: `OOMKilled` is `true`.
+- **Manual stop** or interrupted deployment (`docker compose down` without `up`).
+- **Server rebooted** with no `restart:` policy on the service.
+- **Service intentionally removed**.
 
 ## Actions
 
-1. Relancez le service : `docker compose up -d SERVICE`, puis suivez ses logs.
-2. OOM : augmentez la limite mémoire ou corrigez la fuite.
-3. Ajoutez `restart: unless-stopped` au service si ce n'est pas déjà le cas.
-4. Service supprimé volontairement : retirez-le de `observa.yaml`, relancez `observa apply`, et mettez l'alerte en silence pour 24 h (Grafana › Alerting › Silences, source Alertmanager).
+1. Restart the service: `docker compose up -d SERVICE`, then follow its logs.
+2. OOM: raise the memory limit or fix the leak.
+3. Add `restart: unless-stopped` to the service if it is not already there.
+4. Service intentionally removed: remove it from `observa.yaml`, run `observa apply` again, and silence the alert for 24 h (Grafana › Alerting › Silences, Alertmanager source).
 
-## Vérifier le retour à la normale
+## Verify recovery
 
-- *Vu il y a* revient à quelques secondes.
-- L'alerte est résolue après une minute.
+- *Last seen* goes back to a few seconds.
+- The alert resolves after a minute.

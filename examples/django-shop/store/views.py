@@ -28,7 +28,7 @@ def home(request):
     # visible in traces as a burst of SQL spans.
     products = Product.objects.order_by("id")[:20]
     rows = "".join(f"<li>{p.name} — {p.category.name} — {p.price_cents / 100:.2f} €</li>" for p in products)
-    return HttpResponse(f"<h1>Boutique ObservaBoard</h1><ul>{rows}</ul>")
+    return HttpResponse(f"<h1>ObservaBoard Shop</h1><ul>{rows}</ul>")
 
 
 @require_GET
@@ -48,7 +48,7 @@ def product_detail(request, pk):
 
 
 def charge_payment(order):
-    """Appel à un « prestataire de paiement » externe (simulé)."""
+    """Call to an external "payment provider" (simulated)."""
     if chaos.active("dependency"):
         # The provider stops responding: wait for the timeout, then fail.
         time.sleep(3)
@@ -65,7 +65,7 @@ def order_create(request):
         product_id = int(payload.get("product_id", 0))
         quantity = max(1, int(payload.get("quantity", 1)))
     except (ValueError, TypeError):
-        return JsonResponse({"error": "requête invalide"}, status=400)
+        return JsonResponse({"error": "invalid request"}, status=400)
     product = get_object_or_404(Product, pk=product_id)
     with transaction.atomic():
         order = Order.objects.create(product=product, quantity=quantity)
@@ -74,12 +74,12 @@ def order_create(request):
     except urllib.error.URLError as exc:
         order.status = "failed"
         order.save(update_fields=["status"])
-        log.error("paiement impossible pour la commande %s : %s", order.id, exc)
-        return JsonResponse({"error": "paiement indisponible"}, status=502)
+        log.error("payment failed for order %s: %s", order.id, exc)
+        return JsonResponse({"error": "payment unavailable"}, status=502)
     order.status = "paid"
     order.save(update_fields=["status"])
     send_confirmation.delay(order.id)
-    log.info("commande %s payée (%s x %s)", order.id, quantity, product.name)
+    log.info("order %s paid (%s x %s)", order.id, quantity, product.name)
     return JsonResponse({"id": order.id, "status": order.status}, status=201)
 
 

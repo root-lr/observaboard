@@ -17,7 +17,7 @@
 	}
 {{- else}}
 	# No active token: all ingestion is rejected (observa token create).
-	respond "aucun token actif" 401
+	respond "no active token" 401
 {{- end}}
 }
 

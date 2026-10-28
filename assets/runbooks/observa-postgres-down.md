@@ -1,48 +1,48 @@
-# ObservaPostgresDown — PostgreSQL injoignable
+# ObservaPostgresDown — PostgreSQL unreachable
 
-**Sévérité :** critique · **Déclenchement :** l'exporter de l'agent n'arrive plus à se connecter à la base depuis 2 minutes (`pg_up` = 0).
+**Severity:** critical · **Fires when:** the agent's exporter has been unable to connect to the database for 2 minutes (`pg_up` = 0).
 
-## Ce que signifie l'alerte
+## What the alert means
 
-Soit PostgreSQL est arrêté ou refuse les connexions, soit l'agent ne peut plus l'atteindre (réseau `observa`, identifiants).
+Either PostgreSQL is stopped or refusing connections, or the agent can no longer reach it (`observa` network, credentials).
 
-## Impact pour les utilisateurs
+## User impact
 
-Si la base est réellement arrêtée, toutes les fonctionnalités qui en dépendent échouent : erreurs 5xx sur les API.
+If the database is really down, every feature that depends on it fails: 5xx errors on the APIs.
 
-## Dashboards à ouvrir
+## Dashboards to open
 
-1. **PostgreSQL** : *Joignable* et *Logs du service*.
-2. **Service HTTP** des applications qui utilisent la base : si elles n'ont pas d'erreurs, le problème vient de la connexion de l'agent, pas de la base.
+1. **PostgreSQL**: *Reachable* and *Service logs*.
+2. **HTTP service** of the applications using the database: if they show no errors, the problem is the agent's connection, not the database.
 
-## Requêtes utiles
+## Useful queries
 
 ```logql
-{project="PROJET", env="ENV", service="SERVICE"} |~ "(?i)(fatal|panic|error|could not)"
+{project="PROJECT", env="ENV", service="SERVICE"} |~ "(?i)(fatal|panic|error|could not)"
 ```
 
-Sur le serveur :
+On the server:
 
 ```bash
 docker compose ps SERVICE
 docker logs --tail 50 observa-agent 2>&1 | grep -i postgres
-docker exec -it <conteneur-postgres> pg_isready
+docker exec -it <postgres-container> pg_isready
 ```
 
-## Causes probables
+## Likely causes
 
-- **Base arrêtée** ou en cours de redémarrage.
-- **Disque plein** : PostgreSQL s'arrête quand il ne peut plus écrire.
-- **Trop de connexions** : `FATAL: sorry, too many clients already`.
-- **Identifiants de l'agent invalides** : mot de passe changé, variable du `.env` de l'agent incorrecte.
-- **Conteneur sorti du réseau `observa`** (override non appliqué).
+- **Database stopped** or restarting.
+- **Disk full**: PostgreSQL stops when it can no longer write.
+- **Too many connections**: `FATAL: sorry, too many clients already`.
+- **Invalid agent credentials**: password changed, wrong variable in the agent's `.env`.
+- **Container no longer on the `observa` network** (override not applied).
 
 ## Actions
 
-1. Base arrêtée : `docker compose up -d SERVICE` et lisez ses logs.
-2. Disque plein : libérez de l'espace (voir le runbook ObservaHostDiskFull).
-3. Identifiants : `observa agent env set <VARIABLE>='postgresql://...'` puis `observa agent reload`.
+1. Database stopped: `docker compose up -d SERVICE` and read its logs.
+2. Disk full: free up space (see the ObservaHostDiskFull runbook).
+3. Credentials: `observa agent env set <VARIABLE>='postgresql://...'` then `observa agent reload`.
 
-## Vérifier le retour à la normale
+## Verify recovery
 
-- *Joignable* repasse à 1 et les applications ne renvoient plus d'erreurs.
+- *Reachable* goes back to 1 and the applications no longer return errors.

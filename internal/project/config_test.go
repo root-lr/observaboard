@@ -26,7 +26,7 @@ services:
     alerts:
       queue_length: 500
 notifications:
-  critical: [telegram-ops, email-moi]
+  critical: [telegram-ops, email-me]
   warning: [slack-wulo]
 `
 
@@ -55,17 +55,17 @@ func TestParseValid(t *testing.T) {
 func TestParseRejects(t *testing.T) {
 	cases := map[string]struct{ yaml, want string }{
 		"unknown key":        {"version: 1\nproject: a\nenv: prod\nservices: {api: {preset: django}}\nfoo: 1\n", "field foo not found"},
-		"bad version":        {"version: 2\nproject: a\nenv: prod\nservices: {api: {preset: django}}\n", "version doit valoir 1"},
+		"bad version":        {"version: 2\nproject: a\nenv: prod\nservices: {api: {preset: django}}\n", "version must be 1"},
 		"bad project":        {"version: 1\nproject: Mon_Projet\nenv: prod\nservices: {api: {preset: django}}\n", "project"},
-		"no services":        {"version: 1\nproject: a\nenv: prod\nservices: {}\n", "au moins un service"},
-		"unknown preset":     {"version: 1\nproject: a\nenv: prod\nservices: {api: {preset: rails}}\n", "preset \"rails\" inconnu"},
-		"unknown alert":      {"version: 1\nproject: a\nenv: prod\nservices: {api: {preset: django, alerts: {cpu: 3}}}\n", "alerts.cpu inconnu"},
-		"alert out of range": {"version: 1\nproject: a\nenv: prod\nservices: {api: {preset: django, alerts: {error_rate_pct: 300}}}\n", "hors limites"},
-		"otel on postgres":   {"version: 1\nproject: a\nenv: prod\nservices: {db: {preset: postgres, instrumentation: otel, runtime: python}}\n", "sans objet"},
-		"otel wrong runtime": {"version: 1\nproject: a\nenv: prod\nservices: {api: {preset: django, runtime: node, instrumentation: otel}}\n", "attend le runtime python"},
-		"bad healthcheck":    {"version: 1\nproject: a\nenv: prod\nservices: {api: {preset: django, healthcheck: health}}\n", "doit commencer par /"},
-		"bad channel":        {"version: 1\nproject: a\nenv: prod\nservices: {api: {preset: django}}\nnotifications: {critical: [Ops Team]}\n", "canal"},
-		"ebpf without port":  {"version: 1\nproject: a\nenv: prod\nservices: {x: {preset: generic, instrumentation: ebpf}}\n", "port requis"},
+		"no services":        {"version: 1\nproject: a\nenv: prod\nservices: {}\n", "at least one service"},
+		"unknown preset":     {"version: 1\nproject: a\nenv: prod\nservices: {api: {preset: rails}}\n", "preset \"rails\" is unknown"},
+		"unknown alert":      {"version: 1\nproject: a\nenv: prod\nservices: {api: {preset: django, alerts: {cpu: 3}}}\n", "alerts.cpu is unknown"},
+		"alert out of range": {"version: 1\nproject: a\nenv: prod\nservices: {api: {preset: django, alerts: {error_rate_pct: 300}}}\n", "out of range"},
+		"otel on postgres":   {"version: 1\nproject: a\nenv: prod\nservices: {db: {preset: postgres, instrumentation: otel, runtime: python}}\n", "not applicable"},
+		"otel wrong runtime": {"version: 1\nproject: a\nenv: prod\nservices: {api: {preset: django, runtime: node, instrumentation: otel}}\n", "expects runtime python"},
+		"bad healthcheck":    {"version: 1\nproject: a\nenv: prod\nservices: {api: {preset: django, healthcheck: health}}\n", "must start with /"},
+		"bad channel":        {"version: 1\nproject: a\nenv: prod\nservices: {api: {preset: django}}\nnotifications: {critical: [Ops Team]}\n", "channel"},
+		"ebpf without port":  {"version: 1\nproject: a\nenv: prod\nservices: {x: {preset: generic, instrumentation: ebpf}}\n", "port required"},
 	}
 	for name, tc := range cases {
 		t.Run(name, func(t *testing.T) {

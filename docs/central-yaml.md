@@ -1,69 +1,69 @@
-# Référence : central.yaml
+# Reference: central.yaml
 
-`central.yaml` contient les réglages du serveur central, y compris les secrets des canaux de notification (fichier en mode 0600). Après chaque modification :
+`central.yaml` holds the central server's settings, including the notification channels' secrets (file mode 0600). After every change:
 
 ```bash
 sudo observa central reload
 ```
 
-`reload` régénère les configurations et recharge à chaud ce qui peut l'être : Caddy, Prometheus et Alertmanager. Loki, Tempo et Grafana redémarrent si leur configuration change.
+`reload` regenerates the configurations and hot-reloads what it can: Caddy, Prometheus and Alertmanager. Loki, Tempo and Grafana restart if their configuration changed.
 
 ```yaml
 version: 1
 mode: server                 # server | local (all-in-one)
-domain: observa.example.com  # ou ip: 203.0.113.7 (certificat interne)
-email: vous@example.com      # contact Let's Encrypt (optionnel)
+domain: observa.example.com  # or ip: 203.0.113.7 (internal certificate)
+email: you@example.com       # Let's Encrypt contact (optional)
 admin_user: admin
 retention:
   metrics: 15d               # Prometheus
-  logs: 168h                 # Loki, multiple de 24h
+  logs: 168h                 # Loki, multiple of 24h
   traces: 72h                # Tempo
 notifications:
   smtp:
     smarthost: smtp.example.com:587
-    from: alertes@example.com
-    username: alertes@example.com
+    from: alerts@example.com
+    username: alerts@example.com
     password: "…"
     require_tls: true
   channels:
-    email-moi:      { type: email, to: moi@example.com }
-    slack-wulo:     { type: slack, webhook_url: "https://hooks.slack.com/services/…", channel: "#alertes" }
+    email-me:       { type: email, to: me@example.com }
+    slack-wulo:     { type: slack, webhook_url: "https://hooks.slack.com/services/…", channel: "#alerts" }
     telegram-ops:   { type: telegram, bot_token: "123456:ABC…", chat_id: -1001234567890 }
-    mon-webhook:    { type: webhook, url: "https://example.com/hook" }
-  default: [email-moi]
+    my-webhook:     { type: webhook, url: "https://example.com/hook" }
+  default: [email-me]
   heartbeat_url: https://hc-ping.com/<uuid>
 ```
 
-## Routage des alertes
+## Alert routing
 
-| Alerte | Destinataires |
+| Alert | Recipients |
 | --- | --- |
-| Alerte d'un service dont le projet déclare `notifications.critical` / `warning` | les canaux listés pour sa sévérité |
-| Alerte d'un service sans canal déclaré, alerte serveur (disque, mémoire, agent silencieux), alerte du central | `default` |
-| `Watchdog` (toujours active) | `heartbeat_url` toutes les minutes, sinon ignorée |
+| Alert on a service whose project declares `notifications.critical` / `warning` | the channels listed for its severity |
+| Alert on a service with no declared channel, server alert (disk, memory, silent agent), central alert | `default` |
+| `Watchdog` (always firing) | `heartbeat_url` every minute, otherwise ignored |
 
-Règles d'inhibition :
-- une alerte critique masque les avertissements du même service ;
-- un agent silencieux masque les alertes « service arrêté » de son serveur.
+Inhibition rules:
+- a critical alert inhibits warnings for the same service;
+- a silent agent inhibits the "service down" alerts of its server.
 
-Vérifier le routage sans attendre une vraie panne :
+Check routing without waiting for a real failure:
 
 ```bash
-sudo observa alert test                                         # canaux par défaut
-sudo observa alert test --notify-critical telegram-ops          # canal d'un projet
+sudo observa alert test                                         # default channels
+sudo observa alert test --notify-critical telegram-ops          # a project's channel
 ```
 
 ## Silences
 
-Pour couper temporairement une alerte (maintenance, service retiré volontairement), allez dans Grafana, *Alerting › Silences*, puis choisissez la source **Alertmanager**. Elle est provisionnée automatiquement.
+To mute an alert temporarily (maintenance, service intentionally removed), go to Grafana, *Alerting › Silences*, then pick the **Alertmanager** source. It is provisioned automatically.
 
-## Heartbeat externe
+## External heartbeat
 
-Si Prometheus ou Alertmanager tombent, plus aucune alerte ne part. Créez un check chez un service externe comme healthchecks.io ou un Uptime Kuma en mode push, avec une période d'une minute et une tolérance de 5 minutes, puis renseignez son URL dans `heartbeat_url`. Son silence signale la panne du central.
+If Prometheus or Alertmanager go down, no alert is sent anymore. Create a check with an external service such as healthchecks.io or an Uptime Kuma push monitor, with a one-minute period and a 5-minute grace time, then put its URL in `heartbeat_url`. Its silence signals that the central has failed.
 
 ## Telegram
 
-1. Créez un bot avec @BotFather et récupérez son `bot_token`.
-2. Ajoutez le bot au groupe destinataire.
-3. Récupérez le `chat_id` du groupe (nombre négatif) via `https://api.telegram.org/bot<token>/getUpdates`.
-4. Écrivez `chat_id` comme un nombre, sans guillemets.
+1. Create a bot with @BotFather and get its `bot_token`.
+2. Add the bot to the target group.
+3. Get the group's `chat_id` (a negative number) from `https://api.telegram.org/bot<token>/getUpdates`.
+4. Write `chat_id` as a number, without quotes.

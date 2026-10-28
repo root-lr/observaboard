@@ -35,7 +35,7 @@ type amConfig struct {
 
 const slackText = `{{ range .Alerts }}{{ if eq .Status "firing" }}:red_circle:{{ else }}:white_check_mark:{{ end }} {{ .Annotations.summary }}
 {{ .Annotations.description }}
-Runbook : {{ .Annotations.runbook_url }} — Dashboard : {{ .Annotations.dashboard_url }}
+Runbook: {{ .Annotations.runbook_url }} — Dashboard: {{ .Annotations.dashboard_url }}
 {{ end }}`
 
 const telegramText = `{{ range .Alerts }}{{ if eq .Status "firing" }}🔴{{ else }}✅{{ end }} <b>{{ .Labels.alertname }}</b>
@@ -158,9 +158,9 @@ func RenderAlertmanager(s *Settings) ([]byte, error) {
 	}
 
 	var b bytes.Buffer
-	b.WriteString("# Alertmanager du central ObservaBoard — généré depuis central.yaml (observa central reload).\n")
+	b.WriteString("# ObservaBoard central Alertmanager — generated from central.yaml (observa central reload).\n")
 	if len(n.Default) == 0 {
-		b.WriteString("# ATTENTION : aucun canal par défaut (notifications.default) — les alertes sans canal ne sont envoyées nulle part.\n")
+		b.WriteString("# WARNING: no default channel (notifications.default) — alerts without a channel are sent nowhere.\n")
 	}
 	enc := yaml.NewEncoder(&b)
 	enc.SetIndent(2)

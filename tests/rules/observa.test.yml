@@ -8,7 +8,7 @@ evaluation_interval: 30s
 tests:
   # ---------------------------------------------------------------------------
   # 5xx errors: default threshold (5%), routed to the project's channels.
-  - name: erreurs 5xx au-dessus du seuil par défaut
+  - name: 5xx errors above the default threshold
     interval: 30s
     input_series:
       - series: 'traces_spanmetrics_calls_total{project="shop", env="prod", service="api", span_kind="SPAN_KIND_SERVER", http_response_status_code="200"}'
@@ -37,8 +37,8 @@ tests:
               notify_critical: ops
               notify_warning: team
             exp_annotations:
-              summary: "shop/prod/api : 9.091% de réponses 5xx"
-              description: "La part de réponses 5xx dépasse le seuil depuis 5 minutes."
+              summary: "shop/prod/api: 9.091% 5xx responses"
+              description: "The share of 5xx responses has been above the threshold for 5 minutes."
               runbook_url: "https://example.com/runbooks/observa-high-error-rate"
               dashboard_url: "https://example.com/d/observa-http?var-project=shop&var-env=prod&var-service=api"
       - eval_time: 20m
@@ -47,7 +47,7 @@ tests:
 
   # ---------------------------------------------------------------------------
   # Same traffic with the threshold raised to 20% in observa.yaml: no alert.
-  - name: seuil surchargé par observa.yaml
+  - name: threshold overridden by observa.yaml
     interval: 30s
     input_series:
       - series: 'traces_spanmetrics_calls_total{project="shop", env="prod", service="api", span_kind="SPAN_KIND_SERVER", http_response_status_code="200"}'
@@ -71,7 +71,7 @@ tests:
 
   # ---------------------------------------------------------------------------
   # Traffic too low (fewer than 3 requests/minute): no alert even at 50% errors.
-  - name: pas d'alerte sur un trafic quasi nul
+  - name: no alert on near-zero traffic
     interval: 30s
     input_series:
       - series: 'traces_spanmetrics_calls_total{project="shop", env="prod", service="api", span_kind="SPAN_KIND_SERVER", http_response_status_code="200"}'
@@ -87,7 +87,7 @@ tests:
 
   # ---------------------------------------------------------------------------
   # Service down: the container has not been seen for 10 minutes.
-  - name: service arrêté
+  - name: service down
     interval: 30s
     input_series:
       - series: 'container_last_seen{project="shop", env="prod", service="worker", host="srv-a"}'
@@ -106,14 +106,14 @@ tests:
               service: worker
               host: srv-a
             exp_annotations:
-              summary: "shop/prod/worker ne tourne plus sur srv-a"
-              description: "Le conteneur n'a plus été vu depuis 10m 0s."
+              summary: "shop/prod/worker is no longer running on srv-a"
+              description: "The container has not been seen for 10m 0s."
               runbook_url: "https://example.com/runbooks/observa-service-down"
               dashboard_url: "https://example.com/d/observa-container?var-project=shop&var-env=prod&var-service=worker"
 
   # ---------------------------------------------------------------------------
   # Silent agent: no host metrics for 10 minutes.
-  - name: agent silencieux
+  - name: silent agent
     interval: 30s
     input_series:
       - series: 'node_boot_time_seconds{job="observa/host", host="srv-b"}'
@@ -128,14 +128,14 @@ tests:
               severity: critical
               host: srv-b
             exp_annotations:
-              summary: "L'agent srv-b n'envoie plus de données"
-              description: "Aucune donnée reçue depuis plus de 5 minutes : serveur arrêté, agent tombé ou réseau coupé."
+              summary: "Agent srv-b is no longer sending data"
+              description: "No data received for more than 5 minutes: server down, agent stopped or network cut."
               runbook_url: "https://example.com/runbooks/observa-agent-silent"
               dashboard_url: "https://example.com/d/observa-host?var-host=srv-b"
 
   # ---------------------------------------------------------------------------
   # PostgreSQL: 90 connections out of 100 exceed the default threshold (80%).
-  - name: connexions PostgreSQL
+  - name: PostgreSQL connections
     interval: 30s
     input_series:
       - series: 'pg_up{project="shop", env="prod", service="db"}'
@@ -156,15 +156,15 @@ tests:
               env: prod
               service: db
             exp_annotations:
-              summary: "shop/prod/db : 90% des connexions PostgreSQL utilisées"
-              description: "Le nombre de connexions approche max_connections."
+              summary: "shop/prod/db: 90% of PostgreSQL connections in use"
+              description: "The number of connections is approaching max_connections."
               runbook_url: "https://example.com/runbooks/observa-postgres-connections-high"
               dashboard_url: "https://example.com/d/observa-postgres?var-project=shop&var-env=prod&var-service=db"
 
   # ---------------------------------------------------------------------------
   # Celery queue: 150 messages trigger the alert with the default threshold (100),
   # but not with the threshold raised to 500.
-  - name: file Celery
+  - name: Celery queue
     interval: 30s
     input_series:
       - series: 'redis_up{project="shop", env="prod", service="cache"}'
@@ -187,14 +187,14 @@ tests:
               env: prod
               service: cache
             exp_annotations:
-              summary: "shop/prod : 150 tâches en attente dans la file Celery"
-              description: "La file `celery` sur cache grossit depuis 10 minutes : les workers ne suivent plus."
+              summary: "shop/prod: 150 tasks waiting in the Celery queue"
+              description: "The `celery` queue on cache has been growing for 10 minutes: the workers cannot keep up."
               runbook_url: "https://example.com/runbooks/observa-queue-backlog"
               dashboard_url: "https://example.com/d/observa-celery?var-project=shop&var-env=prod"
 
   # ---------------------------------------------------------------------------
   # Celery tasks: 50% failures (computed from the workers' span metrics).
-  - name: échecs de tâches Celery
+  - name: Celery task failures
     interval: 30s
     input_series:
       - series: 'traces_spanmetrics_calls_total{project="shop", env="prod", service="worker", span_kind="SPAN_KIND_CONSUMER", status_code="STATUS_CODE_OK"}'
@@ -213,15 +213,15 @@ tests:
               env: prod
               service: worker
             exp_annotations:
-              summary: "shop/prod/worker : 50% de tâches en échec"
-              description: "La part de tâches Celery en échec dépasse le seuil depuis 10 minutes."
+              summary: "shop/prod/worker: 50% failed tasks"
+              description: "The share of failed Celery tasks has been above the threshold for 10 minutes."
               runbook_url: "https://example.com/runbooks/observa-celery-task-failures"
               dashboard_url: "https://example.com/d/observa-celery?var-project=shop&var-env=prod&var-service=worker"
 
   # ---------------------------------------------------------------------------
   # Two agents publish different channels for the same service (rollout
   # of a modified observa.yaml in progress): the alert still fires, only once.
-  - name: routage contradictoire entre deux agents
+  - name: conflicting routing between two agents
     interval: 30s
     input_series:
       - series: 'container_last_seen{project="shop", env="prod", service="api", host="srv-a"}'

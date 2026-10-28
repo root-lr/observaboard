@@ -1,44 +1,44 @@
-# ObservaRedisMemoryHigh — Redis proche de maxmemory
+# ObservaRedisMemoryHigh — Redis close to maxmemory
 
-**Sévérité :** avertissement · **Déclenchement :** mémoire utilisée au-dessus du seuil de `maxmemory` pendant 10 minutes. Sans `maxmemory` configuré, l'alerte ne se déclenche pas.
-**Seuil :** 90 % par défaut, modifiable avec `alerts.memory_pct` dans `observa.yaml`.
+**Severity:** warning · **Fires when:** memory used stays above the threshold of `maxmemory` for 10 minutes. Without `maxmemory` configured, the alert never fires.
+**Threshold:** 90% by default, configurable with `alerts.memory_pct` in `observa.yaml`.
 
-## Ce que signifie l'alerte
+## What the alert means
 
-Redis approche sa limite. Selon `maxmemory-policy`, il va évincer des clés (`allkeys-lru`…) ou refuser les écritures (`noeviction`, défaut).
+Redis is approaching its limit. Depending on `maxmemory-policy`, it will evict keys (`allkeys-lru`…) or refuse writes (`noeviction`, the default).
 
-## Impact pour les utilisateurs
+## User impact
 
-Avec `noeviction` : erreurs d'écriture, tâches Celery refusées. Avec éviction : cache moins efficace, sessions perdues.
+With `noeviction`: write errors, Celery tasks rejected. With eviction: less effective cache, lost sessions.
 
-## Dashboards à ouvrir
+## Dashboards to open
 
-1. **Redis** : *Mémoire*, *Clés par base*, *Clés évincées / s*, *File Celery*.
+1. **Redis**: *Memory*, *Keys per database*, *Evicted keys / s*, *Celery queue*.
 
-## Requêtes utiles
+## Useful queries
 
 ```promql
-redis_memory_used_bytes{project="PROJET", env="ENV", service="SERVICE"} / redis_memory_max_bytes{project="PROJET", env="ENV", service="SERVICE"}
+redis_memory_used_bytes{project="PROJECT", env="ENV", service="SERVICE"} / redis_memory_max_bytes{project="PROJECT", env="ENV", service="SERVICE"}
 ```
 
 ```bash
-docker exec -it <conteneur-redis> redis-cli --bigkeys
-docker exec -it <conteneur-redis> redis-cli info memory
+docker exec -it <redis-container> redis-cli --bigkeys
+docker exec -it <redis-container> redis-cli info memory
 ```
 
-## Causes probables
+## Likely causes
 
-- **File Celery qui grossit** (workers arrêtés).
-- **Clés sans expiration** qui s'accumulent.
-- **Grosses clés** (listes, hash).
+- **Growing Celery queue** (workers stopped).
+- **Keys without expiry** piling up.
+- **Big keys** (lists, hashes).
 
 ## Actions
 
-1. File Celery : voir le runbook ObservaQueueBacklog.
-2. Ajoutez des durées d'expiration (TTL) aux clés de cache.
-3. Choisissez une politique adaptée : `allkeys-lru` pour un cache pur, `noeviction` pour une file.
-4. Augmentez `maxmemory` si le serveur le permet.
+1. Celery queue: see the ObservaQueueBacklog runbook.
+2. Add expiry times (TTL) to cache keys.
+3. Pick a suitable policy: `allkeys-lru` for a pure cache, `noeviction` for a queue.
+4. Increase `maxmemory` if the server allows it.
 
-## Vérifier le retour à la normale
+## Verify recovery
 
-- La mémoire redescend sous le seuil et reste stable.
+- Memory drops back below the threshold and stays stable.

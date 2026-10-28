@@ -1,29 +1,29 @@
-# Mac et Windows
+# Mac and Windows
 
-Docker ne tourne nativement que sous Linux. Sur Mac et Windows, Docker Desktop crée une machine virtuelle Linux cachée, et vos conteneurs tournent dedans. ObservaBoard le détecte automatiquement : `observa doctor` le signale, et l'agent s'adapte.
+Docker only runs natively on Linux. On Mac and Windows, Docker Desktop creates a hidden Linux virtual machine, and your containers run inside it. ObservaBoard detects this automatically: `observa doctor` reports it, and the agent adapts.
 
-## Ce qui fonctionne sous Docker Desktop
+## What works under Docker Desktop
 
-- `observa up --all-in-one --with-example` : central, agent, application d'exemple.
-- Logs, métriques des conteneurs, traces OpenTelemetry (niveau 2), métriques HTTP, alertes, dashboards.
-- `observa init` / `apply` sur vos projets.
+- `observa up --all-in-one --with-example`: central, agent, example application.
+- Logs, container metrics, OpenTelemetry traces (level 2), HTTP metrics, alerts, dashboards.
+- `observa init` / `apply` on your projects.
 
-## Ce qui change
+## What changes
 
-- **Métriques de « l'hôte » :** ce sont celles de la VM Docker, pas de votre Mac ou PC. L'agent ne monte pas `/`, `/proc` ni `/var/lib/docker`, que Docker Desktop ne partage pas.
-- **eBPF :** il dépend du noyau de la VM, sans garantie. Préférez le niveau 2 (OpenTelemetry), qui donne de toute façon plus d'informations.
+- **"Host" metrics:** they are the Docker VM's, not your Mac's or PC's. The agent does not mount `/`, `/proc` or `/var/lib/docker`, which Docker Desktop does not share.
+- **eBPF:** it depends on the VM's kernel, with no guarantee. Prefer level 2 (OpenTelemetry), which gives more information anyway.
 
-## Tester eBPF à coup sûr
+## Testing eBPF reliably
 
-Utilisez une vraie VM Linux :
+Use a real Linux VM:
 
-- **Mac :** OrbStack, Lima ou Colima.
-- **Windows :** installez Docker Engine *dans* une distribution WSL2 (Ubuntu), plutôt que Docker Desktop, puis lancez `observa` depuis cette distribution.
+- **Mac:** OrbStack, Lima or Colima.
+- **Windows:** install Docker Engine *inside* a WSL2 distribution (Ubuntu) rather than Docker Desktop, then run `observa` from that distribution.
 
-Puis : `observa up --all-in-one --with-example --ebpf`.
+Then: `observa up --all-in-one --with-example --ebpf`.
 
 ## Windows
 
-- **Binaire :** il est disponible (`observa-windows-amd64.exe`).
-- **Commandes Docker :** utilisez PowerShell ou WSL2 pour lancer les commandes `docker compose` affichées par la CLI.
-- **Données all-in-one :** elles sont stockées dans `%USERPROFILE%\.observa\local`.
+- **Binary:** it is available (`observa-windows-amd64.exe`).
+- **Docker commands:** use PowerShell or WSL2 to run the `docker compose` commands printed by the CLI.
+- **All-in-one data:** it is stored in `%USERPROFILE%\.observa\local`.

@@ -1,23 +1,23 @@
-# ObservaAgentSilent — un serveur n'envoie plus de données
+# ObservaAgentSilent — a server no longer sends data
 
-**Sévérité :** critique · **Déclenchement :** aucune métrique reçue de l'agent depuis plus de 5 minutes, alors qu'il en envoyait dans les 24 dernières heures.
+**Severity:** critical · **Fires when:** no metric has been received from the agent for more than 5 minutes, although it was sending some in the last 24 hours.
 
-## Ce que signifie l'alerte
+## What the alert means
 
-Le central ne reçoit plus rien du serveur `host`. Les alertes ObservaServiceDown de ce serveur sont masquées tant que celle-ci est active, car elles en découlent.
+The central no longer receives anything from server `host`. ObservaServiceDown alerts for this server are inhibited while this one is active, since they follow from it.
 
-## Impact pour les utilisateurs
+## User impact
 
-Si le serveur est arrêté : tous ses services sont indisponibles. Si seul l'agent est en cause : aucun impact utilisateur, mais vous êtes aveugle sur ce serveur.
+If the server is down: all its services are unavailable. If only the agent is at fault: no user impact, but you are blind on this server.
 
-## Dashboards à ouvrir
+## Dashboards to open
 
-1. **Serveurs** : la dernière valeur reçue indique l'heure de la coupure.
-2. **Vue d'ensemble** : les autres serveurs sont-ils touchés ? Si tous le sont, regardez le central (runbook ObservaCentralDegraded).
+1. **Servers**: the last received value shows when the cut happened.
+2. **Overview**: are other servers affected? If all of them are, look at the central (runbook ObservaCentralDegraded).
 
-## Requêtes utiles
+## Useful queries
 
-Sur le serveur concerné :
+On the affected server:
 
 ```bash
 observa agent status
@@ -25,22 +25,22 @@ docker logs --tail 100 observa-agent
 curl -sS -u <agent>:<token> https://<central>/ingest/ping
 ```
 
-## Causes probables
+## Likely causes
 
-- **Serveur arrêté** ou injoignable (panne, redémarrage, coupure réseau).
-- **Agent arrêté** : `observa-agent` absent de `docker ps`.
-- **Token révoqué** : les envois reçoivent 401 (visible dans les logs de l'agent).
-- **Disque plein** sur le serveur.
-- **Certificat du central** non reconnu (mode IP sans `--ca-file`).
+- **Server down** or unreachable (failure, reboot, network outage).
+- **Agent stopped**: `observa-agent` missing from `docker ps`.
+- **Token revoked**: pushes get a 401 (visible in the agent logs).
+- **Disk full** on the server.
+- **Central certificate** not trusted (IP mode without `--ca-file`).
 
 ## Actions
 
-1. Vérifiez que le serveur répond (SSH, console de l'hébergeur).
-2. Relancez l'agent : `cd /opt/observa/agent && docker compose up -d`.
-3. Token : créez-en un nouveau sur le central (`observa token create <agent>`), puis réinstallez l'agent avec.
-4. Serveur retiré volontairement : révoquez son token et mettez l'alerte en silence 24 h (Grafana › Alerting › Silences, source Alertmanager).
+1. Check that the server responds (SSH, hosting provider console).
+2. Restart the agent: `cd /opt/observa/agent && docker compose up -d`.
+3. Token: create a new one on the central (`observa token create <agent>`), then reinstall the agent with it.
+4. Server intentionally removed: revoke its token and silence the alert for 24 h (Grafana › Alerting › Silences, Alertmanager source).
 
-## Vérifier le retour à la normale
+## Verify recovery
 
-- Les métriques du serveur réapparaissent dans le dashboard Serveurs ; l'alerte se résout en une minute.
-- L'agent rattrape automatiquement les données mises en tampon pendant une coupure courte.
+- The server's metrics reappear in the Servers dashboard; the alert resolves within a minute.
+- The agent automatically catches up on data buffered during a short outage.

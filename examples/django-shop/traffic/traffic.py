@@ -1,6 +1,6 @@
-"""Générateur de trafic : simule des visiteurs de la boutique.
+"""Traffic generator: simulates visitors to the shop.
 
-Variables : TARGET (URL de la boutique), RATE (requêtes par seconde, défaut 4).
+Variables: TARGET (shop URL), RATE (requests per second, default 4).
 """
 import json
 import os
@@ -36,11 +36,11 @@ def visit():
     if r < 0.97:
         return "POST /api/orders/", call("POST", "/api/orders/", {"product_id": random.randint(1, 17), "quantity": random.randint(1, 3)})
     # a few realistic 404s
-    return "GET /api/products/<inconnu>/", call("GET", f"/api/products/{random.randint(500, 900)}/")
+    return "GET /api/products/<unknown>/", call("GET", f"/api/products/{random.randint(500, 900)}/")
 
 
 def main():
-    print(f"Trafic vers {TARGET} ({RATE} req/s)", flush=True)
+    print(f"Traffic to {TARGET} ({RATE} req/s)", flush=True)
     while call("GET", "/health/") != 200:
         time.sleep(2)
     n, errors = 0, 0
@@ -50,7 +50,7 @@ def main():
         n += 1
         errors += status >= 500 or status == 0
         if n % 200 == 0:
-            print(f"{n} requêtes, {errors} erreurs serveur", flush=True)
+            print(f"{n} requests, {errors} server errors", flush=True)
         time.sleep(max(0.0, random.expovariate(RATE) - (time.time() - start)))
 
 

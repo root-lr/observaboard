@@ -146,11 +146,11 @@ func ToHTML(md string) (body, title string) {
 }
 
 const pageTmpl = `<!doctype html>
-<html lang="fr">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>%s · Runbooks ObservaBoard</title>
+<title>%s · ObservaBoard runbooks</title>
 <style>
 :root{--bg:#fbfbfa;--fg:#1d1f21;--muted:#5d6166;--line:#e3e3df;--code:#f1f1ee;--accent:#2557d6}
 @media (prefers-color-scheme:dark){:root{--bg:#141517;--fg:#e6e6e3;--muted:#a0a3a8;--line:#2b2d31;--code:#1e2024;--accent:#7aa2ff}}
@@ -173,7 +173,7 @@ ul,ol{padding-left:22px}
 </head>
 <body>
 <main>
-<nav><a href="/runbooks/">Tous les runbooks</a> · <a href="/">Grafana</a></nav>
+<nav><a href="/runbooks/">All runbooks</a> · <a href="/">Grafana</a></nav>
 %s
 </main>
 </body>
@@ -204,7 +204,7 @@ func RenderAll(fsys fs.FS, dir string) ([]Page, error) {
 	}
 	sort.Slice(pages, func(i, j int) bool { return pages[i].Name < pages[j].Name })
 	var idx strings.Builder
-	idx.WriteString("<h1>Runbooks ObservaBoard</h1>\n<p class=\"muted\">Une procédure par alerte : ce qu'elle signifie, où regarder, quoi faire.</p>\n<ul class=\"list\">\n")
+	idx.WriteString("<h1>ObservaBoard runbooks</h1>\n<p class=\"muted\">One procedure per alert: what it means, where to look, what to do.</p>\n<ul class=\"list\">\n")
 	for _, p := range pages {
 		fmt.Fprintf(&idx, "<li><a href=\"/runbooks/%s\">%s</a></li>\n", p.Name, html.EscapeString(p.Title))
 	}

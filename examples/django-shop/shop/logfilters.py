@@ -2,7 +2,7 @@ import logging
 
 
 class TraceIdDefaults(logging.Filter):
-    """Garantit la présence des champs de corrélation, même sans OpenTelemetry."""
+    """Ensures the correlation fields are present, even without OpenTelemetry."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         if not hasattr(record, "otelTraceID"):

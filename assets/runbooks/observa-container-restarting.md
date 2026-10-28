@@ -1,47 +1,47 @@
-# ObservaContainerRestarting — redémarrages en boucle
+# ObservaContainerRestarting — restart loop
 
-**Sévérité :** avertissement · **Déclenchement :** au moins 3 redémarrages du même conteneur en 15 minutes.
+**Severity:** warning · **Fires when:** the same container restarts at least 3 times in 15 minutes.
 
-## Ce que signifie l'alerte
+## What the alert means
 
-Docker relance le conteneur (politique `restart:`) parce que son processus principal se termine. Le service est disponible par intermittence.
+Docker restarts the container (`restart:` policy) because its main process exits. The service is available only intermittently.
 
-## Impact pour les utilisateurs
+## User impact
 
-Erreurs ponctuelles, requêtes coupées, tâches interrompues, sessions perdues.
+Occasional errors, dropped requests, interrupted tasks, lost sessions.
 
-## Dashboards à ouvrir
+## Dashboards to open
 
-1. **Service · conteneur** : panneau *Redémarrages*, *Mémoire* (montée jusqu'à la limite avant chaque redémarrage = OOM) et *Logs du service*.
+1. **Service · container**: *Restarts* and *Memory* panels (memory climbing to the limit before each restart = OOM), and *Service logs*.
 
-## Requêtes utiles
+## Useful queries
 
 ```promql
-changes(container_start_time_seconds{project="PROJET", env="ENV", service="SERVICE"}[1h])
+changes(container_start_time_seconds{project="PROJECT", env="ENV", service="SERVICE"}[1h])
 ```
 
 ```logql
-{project="PROJET", env="ENV", service="SERVICE"} |~ "(?i)(error|exception|killed|fatal)"
+{project="PROJECT", env="ENV", service="SERVICE"} |~ "(?i)(error|exception|killed|fatal)"
 ```
 
 ```bash
-docker inspect <conteneur> --format '{{.RestartCount}} {{.State.OOMKilled}} {{.State.ExitCode}}'
+docker inspect <container> --format '{{.RestartCount}} {{.State.OOMKilled}} {{.State.ExitCode}}'
 ```
 
-## Causes probables
+## Likely causes
 
-- **Mémoire** : le conteneur atteint sa limite et est tué (`OOMKilled`).
-- **Healthcheck** qui échoue et provoque un redémarrage.
-- **Dépendance absente au démarrage** : l'app quitte si la base ou Redis ne répond pas encore.
-- **Erreur de configuration** intermittente.
+- **Memory**: the container hits its limit and is killed (`OOMKilled`).
+- **Healthcheck** failing and triggering a restart.
+- **Dependency missing at startup**: the app exits if the database or Redis is not answering yet.
+- Intermittent **configuration error**.
 
 ## Actions
 
-1. Lisez les dernières lignes avant chaque redémarrage dans les logs.
-2. OOM : augmentez la limite ou réduisez la consommation (nombre de workers, taille des caches).
-3. Dépendance : ajoutez une attente ou des tentatives au démarrage, ou `depends_on` avec `condition: service_healthy`.
+1. Read the last log lines before each restart.
+2. OOM: raise the limit or reduce consumption (number of workers, cache sizes).
+3. Dependency: add a wait or retries at startup, or `depends_on` with `condition: service_healthy`.
 
-## Vérifier le retour à la normale
+## Verify recovery
 
-- Plus aucun redémarrage pendant 15 minutes.
-- La mémoire reste stable sous la limite.
+- No restart for 15 minutes.
+- Memory stays stable below the limit.

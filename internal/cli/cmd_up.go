@@ -34,17 +34,17 @@ func defaultLocalDir() string {
 
 func runUp(args []string) error {
 	fs := newFlags("observa up", "observa up --all-in-one [--with-example] [--listen 127.0.0.1:3000]")
-	allInOne := fs.Bool("all-in-one", false, "central et agent sur cette machine (poste de dev, test, petit serveur unique)")
-	dir := fs.String("dir", defaultLocalDir(), "dossier de l'installation all-in-one")
-	listen := fs.String("listen", "127.0.0.1:3000", "adresse publiée pour Grafana (0.0.0.0:3000 pour l'ouvrir au réseau)")
-	withExample := fs.Bool("with-example", false, "lancer aussi l'application Django d'exemple avec du trafic")
-	ebpf := fs.Bool("ebpf", false, "activer eBPF sur l'agent (Linux)")
+	allInOne := fs.Bool("all-in-one", false, "central and agent on this machine (dev workstation, testing, small single server)")
+	dir := fs.String("dir", defaultLocalDir(), "all-in-one install directory")
+	listen := fs.String("listen", "127.0.0.1:3000", "address Grafana is published on (0.0.0.0:3000 to expose it on the network)")
+	withExample := fs.Bool("with-example", false, "also run the example Django app with generated traffic")
+	ebpf := fs.Bool("ebpf", false, "enable eBPF on the agent (Linux)")
 	if _, err := parse(fs, args); err != nil {
 		return err
 	}
 	if !*allInOne {
 		fs.Usage()
-		return usagef("seul le mode --all-in-one est disponible pour up ; sur des serveurs séparés : observa central install puis observa agent install")
+		return usagef("up only supports --all-in-one; for separate servers: observa central install, then observa agent install")
 	}
 	if err := dockerx.Available(); err != nil {
 		return err
@@ -66,7 +66,7 @@ func runUp(args []string) error {
 		s.Listen = *listen
 	}
 	if errs := s.Validate(); len(errs) > 0 {
-		return usagef("%s", strings.Join(errs, " ; "))
+		return usagef("%s", strings.Join(errs, "; "))
 	}
 	if err := requireWritable(cd.Path); err != nil {
 		return err
@@ -104,7 +104,7 @@ func runUp(args []string) error {
 		return err
 	}
 	if err := waitHTTP(s.BaseURL()+"/ingest/ping", 60*time.Second); err != nil {
-		warn("Caddy ne répond pas encore sur %s : %v", s.BaseURL(), err)
+		warn("Caddy is not responding yet on %s: %v", s.BaseURL(), err)
 	}
 	fmt.Fprintln(stdout)
 	step("Agent")
@@ -121,21 +121,21 @@ func runUp(args []string) error {
 
 	if *withExample {
 		fmt.Fprintln(stdout)
-		step("Application d'exemple (Django + PostgreSQL + Redis + Celery + trafic)")
+		step("Example app (Django + PostgreSQL + Redis + Celery + traffic)")
 		if err := startExample(filepath.Join(*dir, "example"), ad); err != nil {
 			return err
 		}
 	}
 
 	fmt.Fprintln(stdout)
-	ok("ObservaBoard tourne sur cette machine")
-	info("Grafana : %s  (utilisateur %s, mot de passe dans %s)", s.BaseURL(), s.AdminUser, filepath.Join(cd.Path, ".env"))
-	info("Runbooks : %s/runbooks/", s.BaseURL())
+	ok("ObservaBoard is running on this machine")
+	info("Grafana: %s  (user %s, password in %s)", s.BaseURL(), s.AdminUser, filepath.Join(cd.Path, ".env"))
+	info("Runbooks: %s/runbooks/", s.BaseURL())
 	if *withExample {
-		info("Boutique d'exemple : http://localhost:8000 — données visibles dans Grafana d'ici 1 à 2 minutes.")
-		info("Simuler un incident : docker compose --project-directory %s exec web python manage.py chaos errors", filepath.Join(*dir, "example"))
+		info("Example shop: http://localhost:8000 — data shows up in Grafana within 1 to 2 minutes.")
+		info("Simulate an incident: docker compose --project-directory %s exec web python manage.py chaos errors", filepath.Join(*dir, "example"))
 	}
-	info("Arrêter : observa down --all-in-one")
+	info("Stop: observa down --all-in-one")
 	return nil
 }
 
@@ -236,20 +236,20 @@ func startExample(dir string, ad agent.Dir) error {
 	if err := renderAndRecreate(ad); err != nil { // new .env secret + exporters
 		return err
 	}
-	step("Construction et démarrage de la boutique (premier build : quelques minutes)")
+	step("Building and starting the example shop (first build takes a few minutes)")
 	return dockerx.Run("compose", "--project-directory", dir, "-f", cp, "-f", filepath.Join(dir, initgen.OverrideFileName), "up", "-d", "--build")
 }
 
 func runDown(args []string) error {
 	fs := newFlags("observa down", "observa down --all-in-one [--volumes]")
-	allInOne := fs.Bool("all-in-one", false, "arrêter l'installation all-in-one")
-	dir := fs.String("dir", defaultLocalDir(), "dossier de l'installation all-in-one")
-	volumes := fs.Bool("volumes", false, "supprimer aussi les données (métriques, logs, traces, Grafana)")
+	allInOne := fs.Bool("all-in-one", false, "stop the all-in-one install")
+	dir := fs.String("dir", defaultLocalDir(), "all-in-one install directory")
+	volumes := fs.Bool("volumes", false, "also delete data (metrics, logs, traces, Grafana)")
 	if _, err := parse(fs, args); err != nil {
 		return err
 	}
 	if !*allInOne {
-		return usagef("observa down --all-in-one ; pour un serveur : docker compose --project-directory <dossier> down")
+		return usagef("usage: observa down --all-in-one; for a server: docker compose --project-directory <directory> down")
 	}
 	down := []string{"down", "--remove-orphans"}
 	if *volumes {
@@ -257,7 +257,7 @@ func runDown(args []string) error {
 	}
 	ex := filepath.Join(*dir, "example")
 	if cp := compose.Find(ex); cp != "" {
-		step("Arrêt de la boutique d'exemple")
+		step("Stopping the example shop")
 		args := []string{"compose", "--project-directory", ex, "-f", cp}
 		if fileExists(filepath.Join(ex, initgen.OverrideFileName)) {
 			args = append(args, "-f", filepath.Join(ex, initgen.OverrideFileName))
@@ -269,12 +269,12 @@ func runDown(args []string) error {
 	for _, sub := range []string{"agent", "central"} {
 		p := filepath.Join(*dir, sub)
 		if fileExists(filepath.Join(p, "docker-compose.yml")) {
-			step("Arrêt : %s", sub)
+			step("Stopping %s", sub)
 			if err := dockerx.Compose(p, down...); err != nil {
 				warn("%v", err)
 			}
 		}
 	}
-	ok("Arrêté%s", map[bool]string{true: " (données supprimées)", false: " (données conservées)"}[*volumes])
+	ok("Stopped%s", map[bool]string{true: " (data deleted)", false: " (data kept)"}[*volumes])
 	return nil
 }

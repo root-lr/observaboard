@@ -1,4 +1,4 @@
-"""Réglages de la boutique d'exemple ObservaBoard (volontairement minimalistes)."""
+"""Settings for the ObservaBoard example shop (deliberately minimal)."""
 import os
 from pathlib import Path
 
@@ -6,7 +6,7 @@ import dj_database_url
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "exemple-observaboard-ne-pas-utiliser-en-production")
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "example-observaboard-do-not-use-in-production")
 DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 ALLOWED_HOSTS = ["*"]
 
@@ -41,7 +41,7 @@ DATABASES = {
 }
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-LANGUAGE_CODE = "fr-fr"
+LANGUAGE_CODE = "en-us"
 TIME_ZONE = "UTC"
 USE_TZ = True
 STATIC_URL = "static/"

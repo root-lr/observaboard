@@ -19,14 +19,14 @@ func serverSettings() *Settings {
 	s.Domain = "observa.example.com"
 	tlsOn := true
 	s.Notifications = Notifications{
-		SMTP: SMTP{Smarthost: "smtp.example.com:587", From: "alertes@example.com", Username: "u", Password: "p", RequireTLS: &tlsOn},
+		SMTP: SMTP{Smarthost: "smtp.example.com:587", From: "alerts@example.com", Username: "u", Password: "p", RequireTLS: &tlsOn},
 		Channels: map[string]Channel{
-			"email-moi":    {Type: "email", To: "moi@example.com"},
-			"slack-wulo":   {Type: "slack", WebhookURL: "https://hooks.slack.com/services/X", SlackChannel: "#alertes"},
+			"email-me":     {Type: "email", To: "me@example.com"},
+			"slack-wulo":   {Type: "slack", WebhookURL: "https://hooks.slack.com/services/X", SlackChannel: "#alerts"},
 			"telegram-ops": {Type: "telegram", BotToken: "123:ABC", ChatID: -100123},
 			"hook":         {Type: "webhook", URL: "https://example.com/hook"},
 		},
-		Default:      []string{"email-moi"},
+		Default:      []string{"email-me"},
 		HeartbeatURL: "https://hc-ping.com/uuid",
 	}
 	return s
@@ -42,7 +42,7 @@ func TestSettingsValidation(t *testing.T) {
 	bad.Notifications.Default = []string{"nope"}
 	bad.Notifications.Channels["x"] = Channel{Type: "sms"}
 	errs := strings.Join(bad.Validate(), "\n")
-	for _, want := range []string{"domain (recommandé) ou ip", "multiple de 24", `canal "nope" non défini`, `type "sms" inconnu`} {
+	for _, want := range []string{"domain (recommended) or ip", "multiple of 24", `channel "nope" is not defined`, `unknown type "sms"`} {
 		if !strings.Contains(errs, want) {
 			t.Errorf("missing error %q in:\n%s", want, errs)
 		}
@@ -105,7 +105,7 @@ func TestRenderedFilesAreValid(t *testing.T) {
 
 func TestCaddyWithoutTokensRefusesIngest(t *testing.T) {
 	files := renderAll(t, serverSettings(), nil)
-	if c := string(files["caddy/Caddyfile"]); strings.Contains(c, "basic_auth") || !strings.Contains(c, "respond \"aucun token actif\" 401") {
+	if c := string(files["caddy/Caddyfile"]); strings.Contains(c, "basic_auth") || !regexp.MustCompile(`respond "[^"]+" 401`).MatchString(c) {
 		t.Fatalf("Caddyfile without tokens:\n%s", c)
 	}
 }

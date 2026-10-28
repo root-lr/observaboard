@@ -13,13 +13,13 @@ import (
 )
 
 func runCentralInstall(args []string) error {
-	fs := newFlags("observa central install", "observa central install (--domain <nom> | --ip <adresse>) [options]")
-	dir := fs.String("dir", central.DefaultDir, "dossier d'installation du central")
-	domain := fs.String("domain", "", "nom de domaine pointant vers ce serveur (certificat Let's Encrypt automatique)")
-	ip := fs.String("ip", "", "adresse IP publique, si vous n'avez pas de domaine (certificat interne)")
-	email := fs.String("email", "", "adresse de contact pour Let's Encrypt (optionnel)")
-	firstAgent := fs.String("first-agent", defaultAgentName(), "nom du premier agent pour lequel créer un token")
-	noStart := fs.Bool("no-start", false, "générer les fichiers sans démarrer les conteneurs")
+	fs := newFlags("observa central install", "observa central install (--domain <name> | --ip <address>) [options]")
+	dir := fs.String("dir", central.DefaultDir, "central install directory")
+	domain := fs.String("domain", "", "domain name pointing to this server (automatic Let's Encrypt certificate)")
+	ip := fs.String("ip", "", "public IP address, if you have no domain (internal certificate)")
+	email := fs.String("email", "", "contact email for Let's Encrypt (optional)")
+	firstAgent := fs.String("first-agent", defaultAgentName(), "name of the first agent to create a token for")
+	noStart := fs.Bool("no-start", false, "generate files without starting the containers")
 	if _, err := parse(fs, args); err != nil {
 		return err
 	}
@@ -30,7 +30,7 @@ func runCentralInstall(args []string) error {
 		if s, err = d.Settings(); err != nil {
 			return err
 		}
-		step("Central existant dans %s : mise à jour", *dir)
+		step("Existing central in %s: updating", *dir)
 	} else {
 		s = central.Defaults(central.ModeServer)
 	}
@@ -44,7 +44,7 @@ func runCentralInstall(args []string) error {
 		s.Email = *email
 	}
 	if errs := s.Validate(); len(errs) > 0 {
-		return usagef("réglages invalides :\n  - %s", strings.Join(errs, "\n  - "))
+		return usagef("invalid settings:\n  - %s", strings.Join(errs, "\n  - "))
 	}
 	return installCentral(d, s, *firstAgent, *noStart)
 }
@@ -79,50 +79,50 @@ func installCentral(d central.Dir, s *central.Settings, firstAgent string, noSta
 	if err != nil {
 		return err
 	}
-	ok("Configuration générée dans %s (%d fichiers modifiés)", d.Path, len(res.Changed))
+	ok("Configuration generated in %s (%d files changed)", d.Path, len(res.Changed))
 	if !noStart {
 		if err := dockerx.EnsureNetwork(instrument.NetworkName); err != nil {
 			return err
 		}
 		wasRunning := !dockerx.DryRun && centralRunning(d)
-		step("Démarrage du central (le premier lancement télécharge les images, quelques minutes)")
+		step("Starting the central (the first run pulls images and takes a few minutes)")
 		if err := dockerx.Compose(d.Path, "up", "-d", "--remove-orphans"); err != nil {
 			return err
 		}
 		if wasRunning {
 			// containers kept running: apply config-only changes
 			if err := reloadCentral(d, res); err != nil {
-				warn("rechargement partiel : %v", err)
+				warn("partial reload: %v", err)
 			}
 		}
-		ok("Central démarré")
+		ok("Central started")
 	}
 	fmt.Fprintln(stdout)
-	info("Grafana    : %s", s.BaseURL())
-	info("Runbooks   : %s/runbooks/", s.BaseURL())
-	info("Utilisateur: %s", s.AdminUser)
+	info("Grafana:  %s", s.BaseURL())
+	info("Runbooks: %s/runbooks/", s.BaseURL())
+	info("User:     %s", s.AdminUser)
 	if password != "" {
-		info("Mot de passe (affiché une seule fois, aussi dans %s/.env) : %s", d.Path, password)
+		info("Password (shown only once, also in %s/.env): %s", d.Path, password)
 	}
 	if s.Mode == central.ModeServer {
 		fmt.Fprintln(stdout)
 		if newToken != "" {
-			info("Token du premier agent (%s), affiché une seule fois :", firstAgent)
+			info("First agent token (%s), shown only once:", firstAgent)
 			info("  %s", newToken)
 			fmt.Fprintln(stdout)
-			info("Sur chaque serveur à surveiller :")
+			info("On each server to monitor:")
 			info("  observa agent install --central %s --token %s%s", s.BaseURL(), newToken, caHint(s))
 		} else {
-			info("Créer un token pour un nouveau serveur : observa token create <nom-du-serveur>")
+			info("Create a token for a new server: observa token create <server-name>")
 		}
-		info("Canaux de notification : éditez %s/central.yaml puis observa central reload", d.Path)
+		info("Notification channels: edit %s/central.yaml, then run observa central reload", d.Path)
 	}
 	return nil
 }
 
 func caHint(s *central.Settings) string {
 	if s.IP != "" {
-		return " --ca-file central-ca.crt   (obtenu avec : observa central ca > central-ca.crt)"
+		return " --ca-file central-ca.crt   (get it with: observa central ca > central-ca.crt)"
 	}
 	return ""
 }
@@ -179,7 +179,7 @@ func reloadCentral(d central.Dir, res central.Result) error {
 		}
 	}
 	if len(errs) > 0 {
-		return fmt.Errorf("%s", strings.Join(errs, " ; "))
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
 	return nil
 }
@@ -187,7 +187,7 @@ func reloadCentral(d central.Dir, res central.Result) error {
 func centralDirFlag(fs interface {
 	String(name, value, usage string) *string
 }) *string {
-	return fs.String("dir", defaultCentralDir(), "dossier du central (variable OBSERVA_CENTRAL_DIR)")
+	return fs.String("dir", defaultCentralDir(), "central directory (env OBSERVA_CENTRAL_DIR)")
 }
 
 // defaultCentralDir: OBSERVA_CENTRAL_DIR, else the server install, else the
@@ -206,7 +206,7 @@ func defaultCentralDir() string {
 }
 
 func runCentralReload(args []string) error {
-	fs := newFlags("observa central reload", "observa central reload [--dir <dossier>]")
+	fs := newFlags("observa central reload", "observa central reload [--dir <directory>]")
 	dir := centralDirFlag(fs)
 	if _, err := parse(fs, args); err != nil {
 		return err
@@ -221,14 +221,14 @@ func runCentralReload(args []string) error {
 		return err
 	}
 	if len(res.Changed) == 0 {
-		ok("Aucun changement")
+		ok("No changes")
 		return nil
 	}
 	for _, c := range res.Changed {
-		info("modifié : %s", c)
+		info("changed: %s", c)
 	}
 	if !centralRunning(d) {
-		warn("Le central n'est pas démarré : docker compose --project-directory %s up -d", d.Path)
+		warn("The central is not running: docker compose --project-directory %s up -d", d.Path)
 		return nil
 	}
 	if res.Has("docker-compose.yml") {
@@ -239,12 +239,12 @@ func runCentralReload(args []string) error {
 	if err := reloadCentral(d, res); err != nil {
 		return err
 	}
-	ok("Central rechargé")
+	ok("Central reloaded")
 	return nil
 }
 
 func runCentralUpgrade(args []string) error {
-	fs := newFlags("observa central upgrade", "observa central upgrade [--dir <dossier>]")
+	fs := newFlags("observa central upgrade", "observa central upgrade [--dir <directory>]")
 	dir := centralDirFlag(fs)
 	if _, err := parse(fs, args); err != nil {
 		return err
@@ -257,19 +257,19 @@ func runCentralUpgrade(args []string) error {
 	if _, err := d.Render(s); err != nil {
 		return err
 	}
-	step("Téléchargement des nouvelles images")
+	step("Pulling new images")
 	if err := dockerx.Compose(d.Path, "pull"); err != nil {
 		return err
 	}
 	if err := dockerx.Compose(d.Path, "up", "-d", "--remove-orphans"); err != nil {
 		return err
 	}
-	ok("Central à jour (données et configuration conservées)")
+	ok("Central up to date (data and configuration kept)")
 	return nil
 }
 
 func runCentralStatus(args []string) error {
-	fs := newFlags("observa central status", "observa central status [--dir <dossier>]")
+	fs := newFlags("observa central status", "observa central status [--dir <directory>]")
 	dir := centralDirFlag(fs)
 	if _, err := parse(fs, args); err != nil {
 		return err
@@ -279,12 +279,12 @@ func runCentralStatus(args []string) error {
 	if err != nil {
 		return err
 	}
-	info("URL : %s (mode %s)", s.BaseURL(), s.Mode)
+	info("URL: %s (mode %s)", s.BaseURL(), s.Mode)
 	return dockerx.Compose(d.Path, "ps")
 }
 
 func runCentralCA(args []string) error {
-	fs := newFlags("observa central ca", "observa central ca [--dir <dossier>] > central-ca.crt")
+	fs := newFlags("observa central ca", "observa central ca [--dir <directory>] > central-ca.crt")
 	dir := centralDirFlag(fs)
 	if _, err := parse(fs, args); err != nil {
 		return err
@@ -295,7 +295,7 @@ func runCentralCA(args []string) error {
 	}
 	out, err := dockerx.ComposeOutput(d.Path, "exec", "-T", "caddy", "cat", "/data/caddy/pki/authorities/local/root.crt")
 	if err != nil {
-		return fmt.Errorf("certificat introuvable (central démarré en mode --ip ?) : %v", err)
+		return fmt.Errorf("certificate not found (is the central running in --ip mode?): %v", err)
 	}
 	fmt.Fprint(stdout, out)
 	return nil
@@ -304,14 +304,14 @@ func runCentralCA(args []string) error {
 // --- tokens ---
 
 func runTokenCreate(args []string) error {
-	fs := newFlags("observa token create", "observa token create <agent> [--dir <dossier-central>]")
+	fs := newFlags("observa token create", "observa token create <agent> [--dir <central-directory>]")
 	dir := centralDirFlag(fs)
 	pos, err := parse(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(pos) != 1 {
-		return usagef("précisez le nom de l'agent : observa token create <agent> (ex. srv-a)")
+		return usagef("specify the agent name: observa token create <agent> (e.g. srv-a)")
 	}
 	d := central.Dir{Path: *dir}
 	s, err := d.Settings()
@@ -331,15 +331,15 @@ func runTokenCreate(args []string) error {
 			return err
 		}
 	}
-	ok("Token créé pour %s (affiché une seule fois) :", pos[0])
+	ok("Token created for %s (shown only once):", pos[0])
 	fmt.Fprintf(stdout, "\n  %s\n\n", tok)
-	info("Sur le serveur %s :", pos[0])
+	info("On server %s:", pos[0])
 	info("  observa agent install --central %s --token %s%s", s.BaseURL(), tok, caHint(s))
 	return nil
 }
 
 func runTokenList(args []string) error {
-	fs := newFlags("observa token list", "observa token list [--dir <dossier-central>]")
+	fs := newFlags("observa token list", "observa token list [--dir <central-directory>]")
 	dir := centralDirFlag(fs)
 	if _, err := parse(fs, args); err != nil {
 		return err
@@ -350,10 +350,10 @@ func runTokenList(args []string) error {
 		return err
 	}
 	if len(tokens) == 0 {
-		info("Aucun token. Créez-en un : observa token create <agent>")
+		info("No tokens. Create one: observa token create <agent>")
 		return nil
 	}
-	fmt.Fprintf(stdout, "%-24s %s\n", "AGENT", "CRÉÉ LE")
+	fmt.Fprintf(stdout, "%-24s %s\n", "AGENT", "CREATED")
 	for _, t := range tokens {
 		fmt.Fprintf(stdout, "%-24s %s\n", t.Name, t.Created)
 	}
@@ -361,14 +361,14 @@ func runTokenList(args []string) error {
 }
 
 func runTokenRevoke(args []string) error {
-	fs := newFlags("observa token revoke", "observa token revoke <agent> [--dir <dossier-central>]")
+	fs := newFlags("observa token revoke", "observa token revoke <agent> [--dir <central-directory>]")
 	dir := centralDirFlag(fs)
 	pos, err := parse(fs, args)
 	if err != nil {
 		return err
 	}
 	if len(pos) != 1 {
-		return usagef("précisez l'agent : observa token revoke <agent>")
+		return usagef("specify the agent: observa token revoke <agent>")
 	}
 	d := central.Dir{Path: *dir}
 	s, err := d.Settings()
@@ -387,7 +387,7 @@ func runTokenRevoke(args []string) error {
 			return err
 		}
 	}
-	ok("Token de %s révoqué : ses envois sont désormais refusés (401)", pos[0])
+	ok("Token for %s revoked: its requests are now rejected (401)", pos[0])
 	return nil
 }
 

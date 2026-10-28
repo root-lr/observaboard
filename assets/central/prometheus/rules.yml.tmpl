@@ -92,8 +92,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }} ne tourne plus sur {{ $labels.host }}"
-          description: "Le conteneur n'a plus été vu depuis {{ $value | humanizeDuration }}."
+          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }} is no longer running on {{ $labels.host }}"
+          description: "The container has not been seen for {{ $value | humanizeDuration }}."
           runbook_url: "[[.BaseURL]]/runbooks/observa-service-down"
           dashboard_url: "[[.BaseURL]]/d/observa-container?var-project={{ $labels.project }}&var-env={{ $labels.env }}&var-service={{ $labels.service }}"
 
@@ -105,8 +105,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }} redémarre en boucle"
-          description: "{{ $value }} redémarrages en 15 minutes sur {{ $labels.host }}."
+          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }} is restarting in a loop"
+          description: "{{ $value }} restarts in 15 minutes on {{ $labels.host }}."
           runbook_url: "[[.BaseURL]]/runbooks/observa-container-restarting"
           dashboard_url: "[[.BaseURL]]/d/observa-container?var-project={{ $labels.project }}&var-env={{ $labels.env }}&var-service={{ $labels.service }}"
 
@@ -123,8 +123,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }} : {{ $value | humanizePercentage }} de réponses 5xx"
-          description: "La part de réponses 5xx dépasse le seuil depuis 5 minutes."
+          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }}: {{ $value | humanizePercentage }} 5xx responses"
+          description: "The share of 5xx responses has been above the threshold for 5 minutes."
           runbook_url: "[[.BaseURL]]/runbooks/observa-high-error-rate"
           dashboard_url: "[[.BaseURL]]/d/observa-http?var-project={{ $labels.project }}&var-env={{ $labels.env }}&var-service={{ $labels.service }}"
 
@@ -141,8 +141,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }} : latence p95 de {{ $value | humanizeDuration }}"
-          description: "La latence p95 dépasse le seuil depuis 10 minutes."
+          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }}: p95 latency of {{ $value | humanizeDuration }}"
+          description: "The p95 latency has been above the threshold for 10 minutes."
           runbook_url: "[[.BaseURL]]/runbooks/observa-high-latency"
           dashboard_url: "[[.BaseURL]]/d/observa-http?var-project={{ $labels.project }}&var-env={{ $labels.env }}&var-service={{ $labels.service }}"
 
@@ -159,8 +159,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }} : {{ $value | humanizePercentage }} de tâches en échec"
-          description: "La part de tâches Celery en échec dépasse le seuil depuis 10 minutes."
+          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }}: {{ $value | humanizePercentage }} failed tasks"
+          description: "The share of failed Celery tasks has been above the threshold for 10 minutes."
           runbook_url: "[[.BaseURL]]/runbooks/observa-celery-task-failures"
           dashboard_url: "[[.BaseURL]]/d/observa-celery?var-project={{ $labels.project }}&var-env={{ $labels.env }}&var-service={{ $labels.service }}"
 
@@ -176,8 +176,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }} : PostgreSQL injoignable"
-          description: "L'exporter de l'agent n'arrive plus à se connecter à la base."
+          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }}: PostgreSQL unreachable"
+          description: "The agent's exporter can no longer connect to the database."
           runbook_url: "[[.BaseURL]]/runbooks/observa-postgres-down"
           dashboard_url: "[[.BaseURL]]/d/observa-postgres?var-project={{ $labels.project }}&var-env={{ $labels.env }}&var-service={{ $labels.service }}"
 
@@ -195,8 +195,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }} : {{ $value | humanizePercentage }} des connexions PostgreSQL utilisées"
-          description: "Le nombre de connexions approche max_connections."
+          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }}: {{ $value | humanizePercentage }} of PostgreSQL connections in use"
+          description: "The number of connections is approaching max_connections."
           runbook_url: "[[.BaseURL]]/runbooks/observa-postgres-connections-high"
           dashboard_url: "[[.BaseURL]]/d/observa-postgres?var-project={{ $labels.project }}&var-env={{ $labels.env }}&var-service={{ $labels.service }}"
 
@@ -209,8 +209,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }} : Redis injoignable"
-          description: "L'exporter de l'agent n'arrive plus à se connecter à Redis."
+          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }}: Redis unreachable"
+          description: "The agent's exporter can no longer connect to Redis."
           runbook_url: "[[.BaseURL]]/runbooks/observa-redis-down"
           dashboard_url: "[[.BaseURL]]/d/observa-redis?var-project={{ $labels.project }}&var-env={{ $labels.env }}&var-service={{ $labels.service }}"
 
@@ -228,8 +228,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }} : Redis à {{ $value | humanizePercentage }} de maxmemory"
-          description: "Au-delà, Redis évince des clés ou refuse les écritures selon sa politique."
+          summary: "{{ $labels.project }}/{{ $labels.env }}/{{ $labels.service }}: Redis at {{ $value | humanizePercentage }} of maxmemory"
+          description: "Beyond it, Redis evicts keys or refuses writes depending on its policy."
           runbook_url: "[[.BaseURL]]/runbooks/observa-redis-memory-high"
           dashboard_url: "[[.BaseURL]]/d/observa-redis?var-project={{ $labels.project }}&var-env={{ $labels.env }}&var-service={{ $labels.service }}"
 
@@ -245,8 +245,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "{{ $labels.project }}/{{ $labels.env }} : {{ $value }} tâches en attente dans la file Celery"
-          description: "La file `celery` sur {{ $labels.service }} grossit depuis 10 minutes : les workers ne suivent plus."
+          summary: "{{ $labels.project }}/{{ $labels.env }}: {{ $value }} tasks waiting in the Celery queue"
+          description: "The `celery` queue on {{ $labels.service }} has been growing for 10 minutes: the workers cannot keep up."
           runbook_url: "[[.BaseURL]]/runbooks/observa-queue-backlog"
           dashboard_url: "[[.BaseURL]]/d/observa-celery?var-project={{ $labels.project }}&var-env={{ $labels.env }}"
 
@@ -262,8 +262,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "L'agent {{ $labels.host }} n'envoie plus de données"
-          description: "Aucune donnée reçue depuis plus de 5 minutes : serveur arrêté, agent tombé ou réseau coupé."
+          summary: "Agent {{ $labels.host }} is no longer sending data"
+          description: "No data received for more than 5 minutes: server down, agent stopped or network cut."
           runbook_url: "[[.BaseURL]]/runbooks/observa-agent-silent"
           dashboard_url: "[[.BaseURL]]/d/observa-host?var-host={{ $labels.host }}"
 
@@ -277,8 +277,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "{{ $labels.host }} : disque {{ $labels.mountpoint }} rempli à {{ $value | humanizePercentage }}"
-          description: "Au-delà de 95 %, bases, logs et Docker risquent de planter."
+          summary: "{{ $labels.host }}: disk {{ $labels.mountpoint }} {{ $value | humanizePercentage }} full"
+          description: "Beyond 95%, databases, logs and Docker may crash."
           runbook_url: "[[.BaseURL]]/runbooks/observa-host-disk-full"
           dashboard_url: "[[.BaseURL]]/d/observa-host?var-host={{ $labels.host }}"
 
@@ -289,8 +289,8 @@ groups:
         labels:
           severity: warning
         annotations:
-          summary: "{{ $labels.host }} : mémoire utilisée à {{ $value | humanizePercentage }}"
-          description: "Le noyau risque de tuer des processus (OOM killer)."
+          summary: "{{ $labels.host }}: {{ $value | humanizePercentage }} memory used"
+          description: "The kernel may start killing processes (OOM killer)."
           runbook_url: "[[.BaseURL]]/runbooks/observa-host-memory-high"
           dashboard_url: "[[.BaseURL]]/d/observa-host?var-host={{ $labels.host }}"
 
@@ -303,8 +303,8 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Central ObservaBoard : {{ $labels.component }} ne répond plus"
-          description: "Une partie des données (métriques, logs ou traces) n'est plus reçue ou plus consultable."
+          summary: "ObservaBoard central: {{ $labels.component }} is not responding"
+          description: "Some data (metrics, logs or traces) is no longer received or viewable."
           runbook_url: "[[.BaseURL]]/runbooks/observa-central-degraded"
           dashboard_url: "[[.BaseURL]]/d/observa-overview"
 
@@ -315,4 +315,4 @@ groups:
         labels:
           severity: none
         annotations:
-          summary: "Watchdog ObservaBoard : la chaîne d'alerte fonctionne"
+          summary: "ObservaBoard watchdog: the alerting pipeline works"

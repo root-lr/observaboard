@@ -140,36 +140,36 @@ func Service(f *compose.File, s *compose.Service) Result {
 	switch {
 	case strings.Contains(cmd, "celery") && (strings.Contains(cmd, "worker") || strings.Contains(cmd, " beat")):
 		r.Preset = "celery"
-		r.Reasons = append(r.Reasons, "commande celery")
+		r.Reasons = append(r.Reasons, "celery command")
 		r.Runtime = presets.RuntimePython
 	case r.Runtime == presets.RuntimePython && deps.Python["django"] && (len(cmd) == 0 || djangoCmdRE.MatchString(cmd) || strings.Contains(cmd, "gunicorn") || strings.Contains(cmd, "uvicorn")):
 		r.Preset = "django"
-		r.Reasons = append(r.Reasons, "dépendance django")
+		r.Reasons = append(r.Reasons, "django dependency")
 	case r.Runtime == presets.RuntimePython && (deps.Python["fastapi"] || deps.Python["starlette"]):
 		r.Preset = "fastapi"
-		r.Reasons = append(r.Reasons, "dépendance fastapi")
+		r.Reasons = append(r.Reasons, "fastapi dependency")
 	case r.Runtime == presets.RuntimePython && strings.Contains(cmd, "manage.py"):
 		r.Preset = "django"
-		r.Reasons = append(r.Reasons, "commande manage.py")
+		r.Reasons = append(r.Reasons, "manage.py command")
 	default:
 		r.Preset = "generic"
 		switch r.Runtime {
 		case presets.RuntimePython:
-			r.Reasons = append(r.Reasons, "application Python sans framework reconnu")
+			r.Reasons = append(r.Reasons, "Python application with no recognized framework")
 		case presets.RuntimeNode:
-			r.Reasons = append(r.Reasons, "application Node.js")
+			r.Reasons = append(r.Reasons, "Node.js application")
 		default:
-			r.Reasons = append(r.Reasons, "aucune technologie reconnue")
+			r.Reasons = append(r.Reasons, "no recognized technology")
 		}
 	}
 
 	r.Port = guessPort(s, cmd)
 	if r.Port == 0 && (r.Preset == "django" || r.Preset == "fastapi") {
 		r.Port = 8000
-		r.Warnings = append(r.Warnings, "port non trouvé, 8000 supposé")
+		r.Warnings = append(r.Warnings, "port not found, assuming 8000")
 	}
 	if s.Build == nil && s.Image == "" {
-		r.Warnings = append(r.Warnings, "ni image ni build : service ignoré par l'instrumentation")
+		r.Warnings = append(r.Warnings, "neither image nor build: service skipped by instrumentation")
 	}
 	return r
 }

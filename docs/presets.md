@@ -1,83 +1,83 @@
-# Presets et langages
+# Presets and languages
 
-Un preset regroupe ce qu'ObservaBoard sait d'une technologie :
-- comment la reconnaître ;
-- comment l'instrumenter ;
-- quel dashboard l'affiche ;
-- quelles alertes la concernent, et avec quels seuils par défaut.
+A preset bundles what ObservaBoard knows about a technology:
+- how to recognize it;
+- how to instrument it;
+- which dashboard displays it;
+- which alerts apply to it, and with which default thresholds.
 
-`observa preset list` et `observa preset show <nom>` affichent cette information.
+`observa preset list` and `observa preset show <name>` display this information.
 
-## Presets V1
+## V1 presets
 
-| Preset | Dashboard | Instrumentation | Données principales |
+| Preset | Dashboard | Instrumentation | Main data |
 | --- | --- | --- | --- |
-| `django` | Service HTTP | OpenTelemetry Python sans code | requêtes par route, erreurs, latences p50/p95/p99, temps SQL, appels sortants, traces lentes et en erreur |
-| `fastapi` | Service HTTP | OpenTelemetry Python sans code | idem |
-| `celery` | Worker Celery | OpenTelemetry Python (tâches = spans *consumer*) | tâches/s par type, échecs, durée p95, file Redis, workers actifs |
-| `postgres` | PostgreSQL | exporter de l'agent | connexions par état, transactions, cache, lignes, verrous, taille |
-| `redis` | Redis | exporter de l'agent | mémoire, clients, commandes, taux de succès, évictions, file Celery |
-| `generic` | Service · conteneur | aucune, ou Node.js sans code, ou eBPF | disponibilité, CPU, mémoire, réseau, redémarrages, logs, HTTP si instrumenté |
+| `django` | HTTP service | zero-code OpenTelemetry Python | requests per route, errors, p50/p95/p99 latencies, SQL time, outgoing calls, slow and failed traces |
+| `fastapi` | HTTP service | zero-code OpenTelemetry Python | same |
+| `celery` | Celery worker | OpenTelemetry Python (tasks = *consumer* spans) | tasks/s by type, failures, p95 duration, Redis queue, active workers |
+| `postgres` | PostgreSQL | agent exporter | connections by state, transactions, cache, rows, locks, size |
+| `redis` | Redis | agent exporter | memory, clients, commands, hit rate, evictions, Celery queue |
+| `generic` | Service · container | none, or zero-code Node.js, or eBPF | availability, CPU, memory, network, restarts, logs, HTTP if instrumented |
 
-Tous les dashboards proposent les logs du service. Une ligne contenant `trace_id=…` ouvre la trace correspondante.
+Every dashboard shows the service logs. A line containing `trace_id=…` opens the matching trace.
 
-## Matrice de support
+## Support matrix
 
-| Technologie | Niveau 1 (logs, ressources) | Traces et métriques HTTP | Preset dédié |
+| Technology | Level 1 (logs, resources) | Traces and HTTP metrics | Dedicated preset |
 | --- | --- | --- | --- |
-| Python : Django, FastAPI, Flask, Odoo… | V1 | V1 (zero-code) | Django, FastAPI, Celery en V1 |
-| Node.js : NestJS, Express, Next.js serveur | V1 | V1 (zero-code, Node 22.15+ pour la dernière version de l'instrumentation) | V2 |
-| Java, PHP, .NET, Ruby | V1 | eBPF en V1, zero-code en V2 | V2 |
-| Go, Rust, autres | V1 | eBPF en V1, SDK manuel | après V2 |
+| Python: Django, FastAPI, Flask, Odoo… | V1 | V1 (zero-code) | Django, FastAPI, Celery in V1 |
+| Node.js: NestJS, Express, Next.js server | V1 | V1 (zero-code, Node 22.15+ for the latest instrumentation release) | V2 |
+| Java, PHP, .NET, Ruby | V1 | eBPF in V1, zero-code in V2 | V2 |
+| Go, Rust, others | V1 | eBPF in V1, manual SDK | after V2 |
 | PostgreSQL, Redis/Valkey | V1 | — | V1 |
 | MySQL, MongoDB, RabbitMQ, Nginx | V1 | — | V2 |
 
-## Comment fonctionne l'instrumentation sans code
+## How zero-code instrumentation works
 
-**Python.** L'image dérivée installe `opentelemetry-distro`, `opentelemetry-exporter-otlp` et, via `opentelemetry-bootstrap -a install`, les instrumentations des bibliothèques présentes : Django, psycopg, requests, redis, celery… La commande est préfixée par `opentelemetry-instrument`. Les sous-processus Python lancés par un `sh -c` héritent de l'instrumentation.
+**Python.** The derived image installs `opentelemetry-distro`, `opentelemetry-exporter-otlp` and, through `opentelemetry-bootstrap -a install`, the instrumentations for the libraries present: Django, psycopg, requests, redis, celery… The command is prefixed with `opentelemetry-instrument`. Python subprocesses started by an `sh -c` inherit the instrumentation.
 
-**Node.js.** L'image dérivée installe `@opentelemetry/auto-instrumentations-node`. `NODE_OPTIONS` reçoit `--require @opentelemetry/auto-instrumentations-node/register` ; une valeur existante est conservée.
+**Node.js.** The derived image installs `@opentelemetry/auto-instrumentations-node`. `NODE_OPTIONS` gets `--require @opentelemetry/auto-instrumentations-node/register`; an existing value is kept.
 
-**Variables posées par l'override.** Les plus importantes :
+**Variables set by the override.** The most important ones:
 
-| Variable | Valeur |
+| Variable | Value |
 | --- | --- |
-| `OTEL_SERVICE_NAME` | nom du service |
+| `OTEL_SERVICE_NAME` | service name |
 | `OTEL_RESOURCE_ATTRIBUTES` | `observa.project`, `observa.env`, `observa.service`, `observa.preset` |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://observa-agent:4318` |
-| `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` (la distro Python utilise gRPC par défaut) |
-| `OTEL_SEMCONV_STABILITY_OPT_IN` | `http` (conventions HTTP stables : `http.route`, `http.response.status_code`) |
-| `OTEL_METRICS_EXPORTER` | `none` (voir [architecture](architecture.md#pourquoi-les-métriques-http-viennent-des-traces)) |
+| `OTEL_EXPORTER_OTLP_PROTOCOL` | `http/protobuf` (the Python distro uses gRPC by default) |
+| `OTEL_SEMCONV_STABILITY_OPT_IN` | `http` (stable HTTP conventions: `http.route`, `http.response.status_code`) |
+| `OTEL_METRICS_EXPORTER` | `none` (see [architecture](architecture.md#why-http-metrics-come-from-traces)) |
 | `OTEL_PYTHON_LOG_CORRELATION` | `true` |
-| `OTEL_PYTHON_EXCLUDED_URLS` | le `healthcheck` du service |
+| `OTEL_PYTHON_EXCLUDED_URLS` | the service's `healthcheck` |
 
-## Corréler logs et traces en Python
+## Correlating logs and traces in Python
 
-`OTEL_PYTHON_LOG_CORRELATION=true` ajoute `otelTraceID` et `otelSpanID` à chaque enregistrement de log. Le format par défaut ne s'applique pas si votre application configure elle-même ses logs, ce qui est le cas de Django avec `LOGGING`. Ajoutez alors ces champs à votre formatter :
+`OTEL_PYTHON_LOG_CORRELATION=true` adds `otelTraceID` and `otelSpanID` to every log record. The default format does not apply if your application configures its own logging, which Django does with `LOGGING`. In that case, add these fields to your formatter:
 
 ```python
 "format": "%(asctime)s %(levelname)s %(name)s trace_id=%(otelTraceID)s %(message)s"
 ```
 
-L'exemple `examples/django-shop/shop/settings.py` montre une configuration complète, avec un filtre qui évite l'erreur quand OpenTelemetry n'est pas actif.
+The example `examples/django-shop/shop/settings.py` shows a complete configuration, with a filter that avoids the error when OpenTelemetry is not active.
 
-## Gunicorn et serveurs multi-processus
+## Gunicorn and multi-process servers
 
-Les traces sont exportées correctement par chaque worker. Le SDK relance ses threads d'export après le `fork`, ce qui a été vérifié avec 3 workers. Évitez l'option `--preload`, qui initialise l'application avant le fork.
+Traces are exported correctly by each worker. The SDK restarts its export threads after the `fork`, which was verified with 3 workers. Avoid the `--preload` option, which initializes the application before the fork.
 
-## Écrire un preset
+## Writing a preset
 
-Un preset touche quatre endroits :
+A preset touches four places:
 
-1. `internal/presets/presets.go` : nom, dashboard, alertes, seuils (`Param`), exporter éventuel.
-2. `internal/detect/detect.go` : règles de reconnaissance (image, dépendance, commande).
-3. `internal/dashboards/dashboards.go` : son dashboard.
-4. `assets/central/prometheus/rules.yml.tmpl` et `assets/runbooks/` : ses alertes et leurs runbooks.
+1. `internal/presets/presets.go`: name, dashboard, alerts, thresholds (`Param`), optional exporter.
+2. `internal/detect/detect.go`: recognition rules (image, dependency, command).
+3. `internal/dashboards/dashboards.go`: its dashboard.
+4. `assets/central/prometheus/rules.yml.tmpl` and `assets/runbooks/`: its alerts and their runbooks.
 
-Les tests vérifient la cohérence de l'ensemble :
-- chaque alerte d'un preset existe ;
-- chaque alerte a son runbook ;
-- chaque seuil a une valeur par défaut ;
-- chaque série `observa:*` utilisée est bien enregistrée.
+Tests check that everything is consistent:
+- every alert of a preset exists;
+- every alert has its runbook;
+- every threshold has a default value;
+- every `observa:*` series used is actually recorded.
 
-Lancez `make test test-rules`.
+Run `make test test-rules`.

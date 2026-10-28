@@ -119,44 +119,44 @@ func (s *Settings) Validate() []string {
 	case ModeServer:
 		switch {
 		case s.Domain == "" && s.IP == "":
-			add("mode server : précisez domain (recommandé) ou ip")
+			add("mode server: set domain (recommended) or ip")
 		case s.Domain != "" && s.IP != "":
-			add("domain et ip sont exclusifs")
+			add("domain and ip are mutually exclusive")
 		case s.Domain != "" && !domainRE.MatchString(strings.ToLower(s.Domain)):
-			add("domain %q invalide", s.Domain)
+			add("invalid domain %q", s.Domain)
 		case s.IP != "" && net.ParseIP(s.IP) == nil:
-			add("ip %q invalide", s.IP)
+			add("invalid ip %q", s.IP)
 		}
 	case ModeLocal:
 		host, port, err := net.SplitHostPort(s.Listen)
 		if err != nil || port == "" {
-			add("listen %q invalide (ex. 127.0.0.1:3000)", s.Listen)
+			add("invalid listen %q (e.g. 127.0.0.1:3000)", s.Listen)
 		} else if host != "" && net.ParseIP(host) == nil && host != "localhost" {
-			add("listen : l'hôte doit être une IP (ex. 127.0.0.1)")
+			add("listen: the host must be an IP (e.g. 127.0.0.1)")
 		}
 	default:
-		add("mode %q inconnu (server ou local)", s.Mode)
+		add("unknown mode %q (server or local)", s.Mode)
 	}
 	if s.Email != "" && !emailRE.MatchString(s.Email) {
-		add("email %q invalide", s.Email)
+		add("invalid email %q", s.Email)
 	}
 	if !project.SlugRE.MatchString(s.AdminUser) {
-		add("admin_user %q invalide", s.AdminUser)
+		add("invalid admin_user %q", s.AdminUser)
 	}
 	if !promDurationRE.MatchString(s.Retention.Metrics) {
-		add("retention.metrics %q invalide (ex. 15d)", s.Retention.Metrics)
+		add("invalid retention.metrics %q (e.g. 15d)", s.Retention.Metrics)
 	}
 	if !goHoursRE.MatchString(s.Retention.Logs) {
-		add("retention.logs %q invalide : en heures, multiple de 24 (ex. 168h)", s.Retention.Logs)
+		add("invalid retention.logs %q: in hours, a multiple of 24 (e.g. 168h)", s.Retention.Logs)
 	} else {
 		var h int
 		fmt.Sscanf(s.Retention.Logs, "%dh", &h)
 		if h%24 != 0 || h < 24 {
-			add("retention.logs doit être un multiple de 24h (ex. 168h)")
+			add("retention.logs must be a multiple of 24h (e.g. 168h)")
 		}
 	}
 	if !goHoursRE.MatchString(s.Retention.Traces) {
-		add("retention.traces %q invalide : en heures (ex. 72h)", s.Retention.Traces)
+		add("invalid retention.traces %q: in hours (e.g. 72h)", s.Retention.Traces)
 	}
 	n := s.Notifications
 	needSMTP := false
@@ -164,40 +164,40 @@ func (s *Settings) Validate() []string {
 		ch := n.Channels[name]
 		where := "notifications.channels." + name
 		if !project.SlugRE.MatchString(name) {
-			add("%s : nom invalide (minuscules, chiffres, tirets)", where)
+			add("%s: invalid name (lowercase letters, digits, hyphens)", where)
 		}
 		switch ch.Type {
 		case "email":
 			if ch.To == "" {
-				add("%s : to requis", where)
+				add("%s: to is required", where)
 			}
 			needSMTP = true
 		case "slack":
 			if !strings.HasPrefix(ch.WebhookURL, "https://") {
-				add("%s : webhook_url https requis", where)
+				add("%s: an https webhook_url is required", where)
 			}
 		case "telegram":
 			if ch.BotToken == "" || ch.ChatID == 0 {
-				add("%s : bot_token et chat_id (entier) requis", where)
+				add("%s: bot_token and chat_id (integer) are required", where)
 			}
 		case "webhook":
 			if !strings.HasPrefix(ch.URL, "http://") && !strings.HasPrefix(ch.URL, "https://") {
-				add("%s : url http(s) requise", where)
+				add("%s: an http(s) url is required", where)
 			}
 		default:
-			add("%s : type %q inconnu (email, slack, telegram, webhook)", where, ch.Type)
+			add("%s: unknown type %q (email, slack, telegram, webhook)", where, ch.Type)
 		}
 	}
 	if needSMTP && (n.SMTP.Smarthost == "" || n.SMTP.From == "") {
-		add("notifications.smtp : smarthost et from requis pour les canaux email")
+		add("notifications.smtp: smarthost and from are required for email channels")
 	}
 	for _, d := range n.Default {
 		if _, ok := n.Channels[d]; !ok {
-			add("notifications.default : canal %q non défini", d)
+			add("notifications.default: channel %q is not defined", d)
 		}
 	}
 	if n.HeartbeatURL != "" && !strings.HasPrefix(n.HeartbeatURL, "http") {
-		add("notifications.heartbeat_url doit être une URL http(s)")
+		add("notifications.heartbeat_url must be an http(s) URL")
 	}
 	return errs
 }
@@ -272,34 +272,34 @@ func (d Dir) Settings() (*Settings, error) {
 	data, err := os.ReadFile(filepath.Join(d.Path, settingsFile))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("aucun central dans %s (observa central install, ou --dir)", d.Path)
+			return nil, fmt.Errorf("no central in %s (observa central install, or --dir)", d.Path)
 		}
 		return nil, err
 	}
 	s := Defaults(ModeServer)
 	s.Listen = ""
 	if err := yaml.Unmarshal(data, s); err != nil {
-		return nil, fmt.Errorf("%s : %w", settingsFile, err)
+		return nil, fmt.Errorf("%s: %w", settingsFile, err)
 	}
 	if errs := s.Validate(); len(errs) > 0 {
-		return s, fmt.Errorf("%s invalide :\n  - %s", settingsFile, strings.Join(errs, "\n  - "))
+		return s, fmt.Errorf("invalid %s:\n  - %s", settingsFile, strings.Join(errs, "\n  - "))
 	}
 	return s, nil
 }
 
-const settingsHeader = `# Réglages du central ObservaBoard.
-# Après modification : observa central reload
+const settingsHeader = `# ObservaBoard central settings.
+# After editing: observa central reload
 #
-# Canaux de notification (exemples) :
+# Notification channels (examples):
 #   notifications:
-#     smtp: { smarthost: "smtp.example.com:587", from: "alertes@example.com", username: "...", password: "..." }
+#     smtp: { smarthost: "smtp.example.com:587", from: "alerts@example.com", username: "...", password: "..." }
 #     channels:
-#       email-moi:    { type: email, to: "moi@example.com" }
-#       slack-equipe: { type: slack, webhook_url: "https://hooks.slack.com/services/...", channel: "#alertes" }
+#       email-me:     { type: email, to: "me@example.com" }
+#       slack-team:   { type: slack, webhook_url: "https://hooks.slack.com/services/...", channel: "#alerts" }
 #       telegram-ops: { type: telegram, bot_token: "123456:ABC...", chat_id: -1001234567890 }
-#       mon-webhook:  { type: webhook, url: "https://example.com/hook" }
-#     default: [email-moi]          # alertes sans canal précisé dans observa.yaml
-#     heartbeat_url: "https://hc-ping.com/<uuid>"   # optionnel, reçoit le Watchdog chaque minute
+#       my-webhook:   { type: webhook, url: "https://example.com/hook" }
+#     default: [email-me]           # alerts with no channel set in observa.yaml
+#     heartbeat_url: "https://hc-ping.com/<uuid>"   # optional, receives the Watchdog every minute
 `
 
 // SaveSettings writes central.yaml (mode 0600: it may contain secrets).

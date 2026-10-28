@@ -88,7 +88,7 @@ func TestServerFlowDryRun(t *testing.T) {
 		t.Fatalf("init exit %d:\n%s", code, out)
 	}
 	out, code = run(t, "apply", filepath.Join(proj, "observa.yaml"), "--agent-dir", adir)
-	if code != 0 || !strings.Contains(out, "boutique/prod enregistré") {
+	if code != 0 || !strings.Contains(out, "boutique/prod registered") {
 		t.Fatalf("apply exit %d:\n%s", code, out)
 	}
 	out, code = run(t, "attach", "legacy_app", "--project", "old", "--preset", "generic", "--agent-dir", adir)
@@ -177,7 +177,7 @@ func TestInitReadsPipedAnswers(t *testing.T) {
 	var out bytes.Buffer
 	stdout, stderr = &out, &out
 	// project, env, then one answer per service (db, redis, traffic, web, worker)
-	stdin = strings.NewReader("shop\nstaging\n\n\nignorer\n\n\n")
+	stdin = strings.NewReader("shop\nstaging\n\n\nignore\n\n\n")
 	in = nil
 	dockerx.DryRun = true
 	defer func() { dockerx.DryRun = false }()

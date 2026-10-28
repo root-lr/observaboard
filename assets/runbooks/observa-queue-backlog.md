@@ -1,45 +1,45 @@
-# ObservaQueueBacklog — la file Celery grossit
+# ObservaQueueBacklog — the Celery queue is growing
 
-**Sévérité :** avertissement · **Déclenchement :** plus de messages en attente dans la liste Redis `celery` que le seuil, pendant 10 minutes.
-**Seuil :** 100 par défaut, modifiable avec `alerts.queue_length` sur le service Redis dans `observa.yaml`.
+**Severity:** warning · **Fires when:** more messages than the threshold are waiting in the Redis `celery` list for 10 minutes.
+**Threshold:** 100 by default, configurable with `alerts.queue_length` on the Redis service in `observa.yaml`.
 
-## Ce que signifie l'alerte
+## What the alert means
 
-Les tâches arrivent plus vite que les workers ne les traitent. Seule la file par défaut `celery` (base 0) est surveillée en V1.
+Tasks arrive faster than the workers process them. Only the default `celery` queue (database 0) is monitored in V1.
 
-## Impact pour les utilisateurs
+## User impact
 
-Les traitements asynchrones prennent du retard : un email part avec plusieurs minutes de décalage, un export n'arrive pas.
+Asynchronous work falls behind: an email goes out several minutes late, an export never arrives.
 
-## Dashboards à ouvrir
+## Dashboards to open
 
-1. **Worker Celery** : *File d'attente*, *Workers actifs*, *Durée p95 par type*.
-2. **Redis** : mémoire (une file qui grossit consomme de la mémoire).
+1. **Celery worker**: *Queue*, *Active workers*, *p95 duration by type*.
+2. **Redis**: memory (a growing queue uses memory).
 
-## Requêtes utiles
+## Useful queries
 
 ```promql
-redis_key_size{project="PROJET", env="ENV", key="celery"}
+redis_key_size{project="PROJECT", env="ENV", key="celery"}
 ```
 
 ```promql
-count((time() - observa:service:last_seen_timestamp{project="PROJET", env="ENV", service="WORKER"}) < 120)
+count((time() - observa:service:last_seen_timestamp{project="PROJECT", env="ENV", service="WORKER"}) < 120)
 ```
 
-## Causes probables
+## Likely causes
 
-- **Workers arrêtés** ou en échec (voir l'alerte ObservaServiceDown sur le worker).
-- **Tâches devenues lentes** (dépendance lente) : la durée p95 augmente.
-- **Pic de tâches** (import massif, campagne d'emails).
-- **Concurrence trop faible** (`--concurrency`).
+- **Workers stopped** or failing (see the ObservaServiceDown alert on the worker).
+- **Tasks became slow** (slow dependency): p95 duration rises.
+- **Task spike** (bulk import, email campaign).
+- **Concurrency too low** (`--concurrency`).
 
 ## Actions
 
-1. Vérifiez que les workers tournent : `docker compose ps`.
-2. Si les tâches sont lentes, traitez la cause (voir les traces).
-3. Ajoutez des workers temporairement : `docker compose up -d --scale worker=3`.
-4. Séparez les tâches lentes dans une file dédiée pour ne pas bloquer les autres.
+1. Check that the workers are running: `docker compose ps`.
+2. If tasks are slow, address the cause (see the traces).
+3. Add workers temporarily: `docker compose up -d --scale worker=3`.
+4. Move slow tasks to a dedicated queue so they don't block the others.
 
-## Vérifier le retour à la normale
+## Verify recovery
 
-- La courbe *File d'attente* redescend vers 0.
+- The *Queue* graph goes back down toward 0.

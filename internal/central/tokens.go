@@ -41,7 +41,7 @@ func (d Dir) Tokens() ([]Token, error) {
 	}
 	var t []Token
 	if err := yaml.Unmarshal(data, &t); err != nil {
-		return nil, fmt.Errorf("%s : %w", tokensFile, err)
+		return nil, fmt.Errorf("%s: %w", tokensFile, err)
 	}
 	return t, nil
 }
@@ -52,7 +52,7 @@ func (d Dir) saveTokens(t []Token) error {
 	if err != nil {
 		return err
 	}
-	header := "# Tokens des agents (hachés). Gérer avec : observa token create|list|revoke\n"
+	header := "# Agent tokens (hashed). Manage with: observa token create|list|revoke\n"
 	_, err = fsutil.WriteFile(filepath.Join(d.Path, tokensFile), append([]byte(header), data...), 0o600)
 	return err
 }
@@ -61,7 +61,7 @@ func (d Dir) saveTokens(t []Token) error {
 // ("<name>.<secret>"); it is shown once and never stored.
 func (d Dir) CreateToken(name string) (string, error) {
 	if !project.SlugRE.MatchString(name) {
-		return "", fmt.Errorf("nom d'agent %q invalide (minuscules, chiffres et tirets, ex. srv-a)", name)
+		return "", fmt.Errorf("invalid agent name %q (lowercase letters, digits and hyphens, e.g. srv-a)", name)
 	}
 	tokens, err := d.Tokens()
 	if err != nil {
@@ -69,7 +69,7 @@ func (d Dir) CreateToken(name string) (string, error) {
 	}
 	for _, t := range tokens {
 		if t.Name == name {
-			return "", fmt.Errorf("un token existe déjà pour %s (révoquez-le d'abord : observa token revoke %s)", name, name)
+			return "", fmt.Errorf("a token already exists for %s (revoke it first: observa token revoke %s)", name, name)
 		}
 	}
 	raw := make([]byte, 32)
@@ -104,7 +104,7 @@ func (d Dir) RevokeToken(name string) error {
 		kept = append(kept, t)
 	}
 	if !found {
-		return fmt.Errorf("aucun token pour %s", name)
+		return fmt.Errorf("no token for %s", name)
 	}
 	return d.saveTokens(kept)
 }
@@ -114,11 +114,11 @@ func SplitToken(tok string) (name, secret string, err error) {
 	tok = strings.TrimSpace(tok)
 	i := strings.Index(tok, ".")
 	if i <= 0 || i == len(tok)-1 {
-		return "", "", errors.New("token invalide : format attendu <agent>.<secret> (affiché par observa token create)")
+		return "", "", errors.New("invalid token: expected format <agent>.<secret> (printed by observa token create)")
 	}
 	name, secret = tok[:i], tok[i+1:]
 	if !project.SlugRE.MatchString(name) {
-		return "", "", fmt.Errorf("token invalide : nom d'agent %q", name)
+		return "", "", fmt.Errorf("invalid token: agent name %q", name)
 	}
 	return name, secret, nil
 }

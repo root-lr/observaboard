@@ -1,20 +1,20 @@
 # ObservaBoard
 
-**Le monitoring de vos applications Docker en une commande.** ObservaBoard installe et configure Grafana, Prometheus, Loki, Tempo et Alertmanager, détecte la stack de chaque projet (Django, FastAPI, Celery, PostgreSQL, Redis…), l'instrumente sans toucher au code et génère dashboards, alertes et runbooks adaptés.
+**Monitoring for your Docker applications in one command.** ObservaBoard installs and configures Grafana, Prometheus, Loki, Tempo and Alertmanager, detects each project's stack (Django, FastAPI, Celery, PostgreSQL, Redis…), instruments it without touching the code, and generates matching dashboards, alerts and runbooks.
 
 ```text
-observa central install --domain observa.example.com     # le cerveau : stockage, dashboards, alertes
-observa agent install --central … --token …              # un agent par serveur à surveiller
-observa init && observa apply                             # dans chaque projet : détection + configuration
+observa central install --domain observa.example.com     # the brain: storage, dashboards, alerts
+observa agent install --central … --token …              # one agent per server to monitor
+observa init && observa apply                             # in each project: detection + configuration
 ```
 
-Self-hosted, natif Docker (Compose ou `docker run`), multi-projets et multi-serveurs. Licence MIT.
+Self-hosted, Docker-native (Compose or `docker run`), multi-project and multi-server. MIT license.
 
 ---
 
-## Essayer en 5 minutes (Mac, Windows ou Linux)
+## Try it in 5 minutes (Mac, Windows or Linux)
 
-Prérequis : Docker (Docker Desktop sur Mac/Windows) et Go 1.24+ pour compiler la CLI.
+Requirements: Docker (Docker Desktop on Mac/Windows) and Go 1.24+ to build the CLI.
 
 ```bash
 git clone https://github.com/root-lr/observaboard && cd observaboard
@@ -22,170 +22,170 @@ make build
 bin/observa up --all-in-one --with-example
 ```
 
-Cette commande lance, sur votre machine :
+This command starts, on your machine:
 
-- le **central** (Grafana sur http://localhost:3000, identifiants affichés) ;
-- l'**agent** ;
-- une **boutique Django d'exemple** (PostgreSQL, Redis, worker Celery) avec un générateur de trafic.
+- the **central** (Grafana at http://localhost:3000, credentials printed);
+- the **agent**;
+- an **example Django shop** (PostgreSQL, Redis, Celery worker) with a traffic generator.
 
-Après une à deux minutes, la *Vue d'ensemble* de Grafana se remplit. Provoquez ensuite une panne et regardez l'alerte se déclencher :
+After one or two minutes, the Grafana *Overview* fills up. Then trigger a failure and watch the alert fire:
 
 ```bash
 docker compose --project-directory ~/.observa/local/example exec web python manage.py chaos errors
-#   autres pannes : latency · dependency · tasks · status · reset
+#   other failures: latency · dependency · tasks · status · reset
 ```
 
-Arrêter : `bin/observa down --all-in-one` (ajoutez `--volumes` pour effacer les données).
+To stop: `bin/observa down --all-in-one` (add `--volumes` to delete the data).
 
 ---
 
-## Déployer pour de vrai
+## Deploying for real
 
 ```text
-              ┌──────────────── Serveur central (petit VPS dédié) ────────────────┐
+              ┌──────────────── Central server (small dedicated VPS) ─────────────┐
               │ Caddy (HTTPS, tokens) → Prometheus · Loki · Tempo → Grafana        │
               │                         Prometheus → Alertmanager → email, Slack…  │
               └───────────────▲───────────────────▲───────────────────▲───────────┘
-                              │      push HTTPS + token par agent      │
+                              │    HTTPS push + one token per agent    │
                    ┌──────────┴─────────┐ ┌───────┴────────────┐ ┌────┴───────────────┐
-                   │ Serveur A          │ │ Serveur B          │ │ Serveur C          │
+                   │ Server A           │ │ Server B           │ │ Server C           │
                    │ agent (Alloy)      │ │ agent (Alloy)      │ │ agent (Alloy)      │
-                   │ projet1 · api/db   │ │ projet2 · api      │ │ projet1 · staging  │
+                   │ project1 · api/db  │ │ project2 · api     │ │ project1 · staging │
                    └────────────────────┘ └────────────────────┘ └────────────────────┘
 ```
 
-### 1. Le central
+### 1. The central
 
-Sur un serveur dédié (2 vCPU, 4 Go de RAM, 50 Go de disque pour les rétentions par défaut), dont le nom de domaine pointe vers son IP :
+On a dedicated server (2 vCPU, 4 GB RAM, 50 GB disk for the default retention periods) whose domain name points to its IP:
 
 ```bash
-sudo observa central install --domain observa.example.com --email vous@example.com
+sudo observa central install --domain observa.example.com --email you@example.com
 ```
 
-La commande affiche le mot de passe Grafana et le token du premier agent. Les deux ne sont montrés qu'une fois. Le certificat HTTPS est obtenu automatiquement (Let's Encrypt).
+The command prints the Grafana password and the first agent's token. Both are shown only once. The HTTPS certificate is obtained automatically (Let's Encrypt).
 
-Sans nom de domaine, utilisez `--ip <adresse>` : Caddy émet alors un certificat interne. Récupérez son autorité avec `observa central ca > central-ca.crt`, puis passez ce fichier aux agents avec `--ca-file`.
+Without a domain name, use `--ip <address>`: Caddy then issues an internal certificate. Fetch its authority with `observa central ca > central-ca.crt`, then pass that file to the agents with `--ca-file`.
 
-Configurez les notifications dans `/opt/observa/central/central.yaml` (email, Slack, Telegram, webhook ; voir [docs/central-yaml.md](docs/central-yaml.md)), puis :
+Configure notifications in `/opt/observa/central/central.yaml` (email, Slack, Telegram, webhook; see [docs/central-yaml.md](docs/central-yaml.md)), then:
 
 ```bash
 sudo observa central reload
-sudo observa alert test          # vérifie qu'une notification arrive
+sudo observa alert test          # checks that a notification arrives
 ```
 
-### 2. Un agent par serveur
+### 2. One agent per server
 
 ```bash
-# sur le central : un token par serveur
+# on the central: one token per server
 sudo observa token create srv-a
 
-# sur le serveur srv-a (le token est lu dans un fichier pour ne pas rester dans l'historique)
+# on server srv-a (the token is read from a file so it does not stay in the shell history)
 sudo observa agent install --central https://observa.example.com --token-file token.txt
 ```
 
-L'agent est un unique conteneur Grafana Alloy. Il **pousse** ses données vers le central : aucun port à ouvrir sur vos serveurs. Il surveille immédiatement l'hôte et tous les conteneurs portant le label `observa.enable=true`.
+The agent is a single Grafana Alloy container. It **pushes** its data to the central: no port to open on your servers. It immediately monitors the host and every container carrying the `observa.enable=true` label.
 
-### 3. Chaque projet
+### 3. Each project
 
-Dans le dépôt du projet (sur votre poste ou sur le serveur) :
+In the project's repository (on your machine or on the server):
 
 ```bash
 observa init
 ```
 
-`init` lit le `docker-compose.yml` et les dépendances (`requirements.txt`, `pyproject.toml`, `package.json`, Dockerfile), propose un preset par service, puis génère :
+`init` reads `docker-compose.yml` and the dependencies (`requirements.txt`, `pyproject.toml`, `package.json`, Dockerfile), suggests a preset per service, then generates:
 
-| Fichier | Rôle |
+| File | Purpose |
 | --- | --- |
-| `observa.yaml` | Description du projet : services, presets, seuils d'alerte, canaux de notification. À versionner. |
-| `docker-compose.observa.yml` | Override Compose : labels, réseau `observa`, variables OpenTelemetry, commande instrumentée. Le compose d'origine n'est jamais modifié. |
-| `Dockerfile.observa` | Image dérivée qui ajoute le SDK OpenTelemetry (Python ou Node.js). |
+| `observa.yaml` | Project description: services, presets, alert thresholds, notification channels. Commit it. |
+| `docker-compose.observa.yml` | Compose override: labels, `observa` network, OpenTelemetry variables, instrumented command. The original compose file is never modified. |
+| `Dockerfile.observa` | Derived image that adds the OpenTelemetry SDK (Python or Node.js). |
 
-Puis, sur le serveur :
+Then, on the server:
 
 ```bash
-observa apply                                                          # seuils, routage, bases de données
+observa apply                                                          # thresholds, routing, databases
 docker compose -f docker-compose.yml -f docker-compose.observa.yml up -d --build
-observa doctor                                                         # tout arrive-t-il ?
+observa doctor                                                         # is everything arriving?
 ```
 
-`observa init` affiche la commande exacte de votre projet. Si un `docker-compose.override.yml` existe, elle l'inclut, car Compose l'ignore dès qu'on passe `-f`.
+`observa init` prints the exact command for your project. If a `docker-compose.override.yml` exists, it includes it, because Compose ignores it as soon as `-f` is passed.
 
-`init` gère les cas courants :
-- `ENTRYPOINT` (c'est lui qui est instrumenté) ;
-- Dockerfiles multi-étapes avec `build.target` ;
-- services en `network_mode: host` (surveillés sans réseau `observa`) ;
-- variables `$` du Dockerfile.
+`init` handles the common cases:
+- `ENTRYPOINT` (that is what gets instrumented);
+- multi-stage Dockerfiles with `build.target`;
+- `network_mode: host` services (monitored without the `observa` network);
+- Dockerfile `$` variables.
 
-Conteneurs lancés sans Compose : `observa init --runtime docker --service api=django --service db=postgres`. Conteneur déjà en marche, sans le redémarrer : `observa attach <conteneur> --project p --preset generic`.
+Containers started without Compose: `observa init --runtime docker --service api=django --service db=postgres`. A container already running, without restarting it: `observa attach <container> --project p --preset generic`.
 
 ---
 
-## Ce qui est surveillé
+## What gets monitored
 
-| Niveau | Ce que vous faites | Ce que vous obtenez |
+| Level | What you do | What you get |
 | --- | --- | --- |
-| **1 · sans toucher l'app** | rien (label `observa.enable`) | logs centralisés, CPU/mémoire/réseau/redémarrages, disponibilité, métriques de l'hôte |
-| **1 · eBPF** (option `--ebpf`, Linux) | déclarer `instrumentation: ebpf` et le port | traces HTTP et métriques HTTP, quel que soit le langage |
-| **2 · démarrage modifié** | appliquer l'override généré | traces détaillées (vues, SQL, appels sortants, Redis, Celery), métriques HTTP par route |
-| **3 · code** | ajouter vos métriques métier (SDK OpenTelemetry) | indicateurs métier (guide en V2) |
+| **1 · no app changes** | nothing (`observa.enable` label) | centralized logs, CPU/memory/network/restarts, availability, host metrics |
+| **1 · eBPF** (`--ebpf` option, Linux) | declare `instrumentation: ebpf` and the port | HTTP traces and HTTP metrics, whatever the language |
+| **2 · modified startup** | apply the generated override | detailed traces (views, SQL, outgoing calls, Redis, Celery), HTTP metrics per route |
+| **3 · code** | add your business metrics (OpenTelemetry SDK) | business indicators (guide in V2) |
 
-| Preset | Détecté par | Dashboard | Alertes par défaut (seuils modifiables) |
+| Preset | Detected by | Dashboard | Default alerts (adjustable thresholds) |
 | --- | --- | --- | --- |
-| `django` | dépendance `django`, `gunicorn`/`manage.py` | Service HTTP | 5xx > 5 % · p95 > 1 s · service arrêté |
-| `fastapi` | dépendance `fastapi`/`starlette` | Service HTTP | 5xx > 5 % · p95 > 1 s · service arrêté |
-| `celery` | commande `celery … worker` | Worker Celery | tâches en échec > 10 % · service arrêté |
-| `postgres` | image `postgres`, `postgis`, `timescale` | PostgreSQL | injoignable · connexions > 80 % |
-| `redis` | image `redis`, `valkey` | Redis | injoignable · mémoire > 90 % · file Celery > 100 |
-| `generic` | tout le reste (Node.js instrumenté automatiquement) | Service · conteneur | arrêté · redémarrages en boucle · 5xx · p95 |
+| `django` | `django` dependency, `gunicorn`/`manage.py` | HTTP service | 5xx > 5% · p95 > 1 s · service down |
+| `fastapi` | `fastapi`/`starlette` dependency | HTTP service | 5xx > 5% · p95 > 1 s · service down |
+| `celery` | `celery … worker` command | Celery worker | failed tasks > 10% · service down |
+| `postgres` | `postgres`, `postgis`, `timescale` image | PostgreSQL | unreachable · connections > 80% |
+| `redis` | `redis`, `valkey` image | Redis | unreachable · memory > 90% · Celery queue > 100 |
+| `generic` | everything else (Node.js instrumented automatically) | Service · container | down · restart loop · 5xx · p95 |
 
-Toujours actives : agent silencieux, disque > 85 %, mémoire > 90 %, composant du central en panne, Watchdog (heartbeat externe optionnel). Chaque alerte renvoie vers un **runbook** (servi sur `/runbooks/`) et vers le dashboard de diagnostic.
+Always on: silent agent, disk > 85%, memory > 90%, central component failure, Watchdog (optional external heartbeat). Every alert links to a **runbook** (served at `/runbooks/`) and to the diagnostic dashboard.
 
-Langages : tout conteneur est couvert au niveau 1. Le niveau 2 couvre **Python** et **Node.js** en V1, puis Java, PHP, .NET et Ruby en V2. Le détail est dans [docs/presets.md](docs/presets.md).
+Languages: every container is covered at level 1. Level 2 covers **Python** and **Node.js** in V1, then Java, PHP, .NET and Ruby in V2. Details in [docs/presets.md](docs/presets.md).
 
 ---
 
-## Commandes
+## Commands
 
-| Commande | Où | Rôle |
+| Command | Where | Purpose |
 | --- | --- | --- |
-| `observa up --all-in-one [--with-example]` | poste, serveur unique | central + agent sur la même machine |
-| `observa down --all-in-one [--volumes]` | idem | tout arrêter |
-| `observa central install --domain …` · `reload` · `upgrade` · `status` · `ca` | central | installer et gérer le central |
-| `observa token create\|list\|revoke <agent>` | central | gérer les tokens des agents |
-| `observa agent install --central … --token-file …` · `reload` · `status` | serveur | installer et gérer l'agent (`--token`, `--token-file`, ou `OBSERVA_AGENT_TOKEN`) |
-| `observa agent env set NOM=valeur` | serveur | secrets de l'agent (accès PostgreSQL, Redis) |
-| `observa init` | projet | détecter la stack, générer `observa.yaml` et l'override |
-| `observa validate` | projet, CI | valider `observa.yaml` |
-| `observa apply [--remove]` | serveur | enregistrer le projet auprès de l'agent |
-| `observa attach <conteneur>` · `detach` | serveur | surveiller un conteneur existant sans labels |
-| `observa preset list\|show <nom>` | partout | presets disponibles |
-| `observa doctor` | partout | diagnostiquer agent, central et projet |
-| `observa alert test` | central | envoyer une alerte de test |
+| `observa up --all-in-one [--with-example]` | workstation, single server | central + agent on the same machine |
+| `observa down --all-in-one [--volumes]` | same | stop everything |
+| `observa central install --domain …` · `reload` · `upgrade` · `status` · `ca` | central | install and manage the central |
+| `observa token create\|list\|revoke <agent>` | central | manage agent tokens |
+| `observa agent install --central … --token-file …` · `reload` · `status` | server | install and manage the agent (`--token`, `--token-file`, or `OBSERVA_AGENT_TOKEN`) |
+| `observa agent env set NAME=value` | server | agent secrets (PostgreSQL, Redis access) |
+| `observa init` | project | detect the stack, generate `observa.yaml` and the override |
+| `observa validate` | project, CI | validate `observa.yaml` |
+| `observa apply [--remove]` | server | register the project with the agent |
+| `observa attach <container>` · `detach` | server | monitor an existing container without labels |
+| `observa preset list\|show <name>` | anywhere | available presets |
+| `observa doctor` | anywhere | diagnose agent, central and project |
+| `observa alert test` | central | send a test alert |
 
-Option globale `--dry-run` : affiche les commandes Docker au lieu de les exécuter.
+Global `--dry-run` option: prints the Docker commands instead of running them.
 
 ---
 
 ## Documentation
 
-- [Architecture et flux de données](docs/architecture.md)
-- [Référence observa.yaml](docs/observa-yaml.md) · [Référence central.yaml](docs/central-yaml.md)
-- [Presets et langages](docs/presets.md)
-- [Sécurité](docs/securite.md)
-- [Mac et Windows](docs/mac-windows.md)
-- [Développement : structure, tests, versions](docs/developpement.md)
-- [Feuille de route V2](docs/v2.md)
+- [Architecture and data flow](docs/architecture.md)
+- [observa.yaml reference](docs/observa-yaml.md) · [central.yaml reference](docs/central-yaml.md)
+- [Presets and languages](docs/presets.md)
+- [Security](docs/security.md)
+- [Mac and Windows](docs/mac-windows.md)
+- [Development: layout, tests, versions](docs/development.md)
+- [V2 roadmap](docs/v2.md)
 
-## Limites connues (V1)
+## Known limitations (V1)
 
-- **Taux d'échantillonnage :** les métriques HTTP sont calculées à partir des traces. Il faut donc échantillonner à 100 %, ce qui est le réglage par défaut, adapté aux trafics modestes à moyens.
-- **Dashboards :** ils sont partagés entre les projets, avec un filtre projet/env/service. Le dossier par projet arrive en V2.
-- **Agent :** il tourne en conteneur privilégié (exigence de cAdvisor) et lit le socket Docker. Les services de tous les projets d'un serveur partagent le réseau `observa`. Voir [docs/securite.md](docs/securite.md).
-- **eBPF :** il nécessite un noyau Linux 5.8+. Sous Docker Desktop, il n'est pas garanti.
-- **Celery :** seule la file `celery` (base 0) est surveillée.
-- **Non couvert :** Kubernetes, serverless et mobile ([PRD](docs/v2.md)).
+- **Sampling rate:** HTTP metrics are computed from traces, so sampling must be 100%. That is the default setting, suited to low and medium traffic.
+- **Dashboards:** they are shared across projects, with a project/env/service filter. Per-project folders come in V2.
+- **Agent:** it runs as a privileged container (a cAdvisor requirement) and reads the Docker socket. Services from all projects on a server share the `observa` network. See [docs/security.md](docs/security.md).
+- **eBPF:** it requires Linux kernel 5.8+. It is not guaranteed under Docker Desktop.
+- **Celery:** only the `celery` queue (database 0) is monitored.
+- **Not covered:** Kubernetes, serverless and mobile ([PRD](docs/v2.md)).
 
-## Licence
+## License
 
-MIT, voir [LICENSE](LICENSE). Les dépendances embarquées dans `internal/thirdparty/` conservent leur licence d'origine (MIT/Apache-2.0, BSD-3-Clause).
+MIT, see [LICENSE](LICENSE). Dependencies vendored in `internal/thirdparty/` keep their original license (MIT/Apache-2.0, BSD-3-Clause).

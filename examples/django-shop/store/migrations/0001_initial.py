@@ -29,7 +29,7 @@ class Migration(migrations.Migration):
             fields=[
                 ("id", models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name="ID")),
                 ("quantity", models.PositiveIntegerField(default=1)),
-                ("status", models.CharField(choices=[("pending", "En attente"), ("paid", "Payée"), ("confirmed", "Confirmée"), ("failed", "Échec")], default="pending", max_length=12)),
+                ("status", models.CharField(choices=[("pending", "Pending"), ("paid", "Paid"), ("confirmed", "Confirmed"), ("failed", "Failed")], default="pending", max_length=12)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("product", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name="orders", to="store.product")),
             ],

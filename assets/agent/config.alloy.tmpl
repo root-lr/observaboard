@@ -134,8 +134,19 @@ prometheus.exporter.unix "host" {
   }
 }
 
+// Alloy exporters label their targets job="integrations/<name>", which wins over
+// job_name: every exporter scrape sets the job explicitly with a relabel rule.
+discovery.relabel "host" {
+  targets = prometheus.exporter.unix.host.targets
+
+  rule {
+    target_label = "job"
+    replacement  = "observa/host"
+  }
+}
+
 prometheus.scrape "host" {
-  targets         = prometheus.exporter.unix.host.targets
+  targets         = discovery.relabel.host.output
   forward_to      = [prometheus.remote_write.central.receiver]
   job_name        = "observa/host"
   scrape_interval = "15s"
@@ -143,8 +154,17 @@ prometheus.scrape "host" {
 
 prometheus.exporter.self "agent" { }
 
+discovery.relabel "agent" {
+  targets = prometheus.exporter.self.agent.targets
+
+  rule {
+    target_label = "job"
+    replacement  = "observa/agent"
+  }
+}
+
 prometheus.scrape "agent" {
-  targets         = prometheus.exporter.self.agent.targets
+  targets         = discovery.relabel.agent.output
   forward_to      = [prometheus.remote_write.central.receiver]
   job_name        = "observa/agent"
   scrape_interval = "60s"
@@ -163,8 +183,17 @@ prometheus.exporter.cadvisor "containers" {
   ]
 }
 
+discovery.relabel "containers" {
+  targets = prometheus.exporter.cadvisor.containers.targets
+
+  rule {
+    target_label = "job"
+    replacement  = "observa/containers"
+  }
+}
+
 prometheus.scrape "containers" {
-  targets         = prometheus.exporter.cadvisor.containers.targets
+  targets         = discovery.relabel.containers.output
   forward_to      = [prometheus.relabel.containers.receiver]
   job_name        = "observa/containers"
   scrape_interval = "15s"
@@ -345,6 +374,10 @@ discovery.relabel {{q .ID}} {
   rule {
     target_label = "preset"
     replacement  = {{q .Kind}}
+  }
+  rule {
+    target_label = "job"
+    replacement  = {{q (print "observa/" .Kind "/" .Project "/" .Env "/" .Service)}}
   }
 }
 

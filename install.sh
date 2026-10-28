@@ -28,7 +28,7 @@ asset="observa-$os-$arch"
 tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
-echo "Downloading $asset…"
+echo "Downloading ${asset}…"
 curl -fsSL "$base/$asset" -o "$tmp/observa"
 curl -fsSL "$base/checksums.txt" -o "$tmp/checksums.txt"
 expected=$(grep " $asset\$" "$tmp/checksums.txt" | cut -d' ' -f1)

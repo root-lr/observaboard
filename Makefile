@@ -47,7 +47,7 @@ test-configs: render
 	docker compose -f build/central/docker-compose.yml config -q
 	docker compose -f build/agent/docker-compose.yml config -q
 	docker compose -f build/shop/compose.yaml -f build/shop/docker-compose.observa.yml config -q
-	@echo "Toutes les configurations sont valides."
+	@echo "All configurations are valid."
 
 # End-to-end test: all-in-one stack + shop + simulated failure (5 to 15 minutes).
 e2e: build
